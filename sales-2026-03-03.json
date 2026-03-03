@@ -1,0 +1,72 @@
+{
+  "date": "2026-03-03",
+  "totalRevenue": 856,
+  "totalBills": 3,
+  "bills": [
+    {
+      "billNo": "BC-20260303-1",
+      "time": "3/3/2026, 6:12:23 AM",
+      "items": [
+        {
+          "name": "Peri Peri Potato Twister",
+          "price": 30,
+          "quantity": 4,
+          "addons": []
+        }
+      ],
+      "paymentMode": "Cash",
+      "total": 120
+    },
+    {
+      "billNo": "BC-20260303-2",
+      "time": "3/3/2026, 6:13:30 AM",
+      "items": [
+        {
+          "name": "Freedom Fries",
+          "price": 40,
+          "quantity": 6,
+          "addons": []
+        }
+      ],
+      "paymentMode": "Cash",
+      "total": 240
+    },
+    {
+      "billNo": "BC-20260303-3",
+      "time": "3/3/2026, 6:29:10 AM",
+      "items": [
+        {
+          "name": "nhi milegi kulfi",
+          "price": 69,
+          "quantity": 4,
+          "addons": []
+        },
+        {
+          "name": "Freedom Fries",
+          "price": 40,
+          "quantity": 3,
+          "addons": []
+        },
+        {
+          "name": "Peri Peri Potato Twister",
+          "price": 30,
+          "quantity": 2,
+          "addons": []
+        },
+        {
+          "name": "Peri Peri Potato Twister",
+          "price": 40,
+          "quantity": 1,
+          "addons": [
+            {
+              "name": "cheese",
+              "price": 10
+            }
+          ]
+        }
+      ],
+      "paymentMode": "Cash",
+      "total": 496
+    }
+  ]
+}

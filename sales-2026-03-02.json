@@ -1,0 +1,49 @@
+{
+  "date": "2026-03-02",
+  "totalRevenue": 490,
+  "totalBills": 3,
+  "bills": [
+    {
+      "billNo": "BC-20260302-1",
+      "time": "03/03/2026, 03:48:23",
+      "items": [
+        {
+          "name": "Veg Cheese Sandwich",
+          "price": 50,
+          "quantity": 2
+        },
+        {
+          "name": "Paneer Tikka Sandwich",
+          "price": 70,
+          "quantity": 3
+        }
+      ],
+      "total": 310
+    },
+    {
+      "billNo": "BC-20260302-1",
+      "time": "03/03/2026, 03:57:28",
+      "items": [
+        {
+          "name": "Peri Peri Potato Twister",
+          "price": 30,
+          "quantity": 1
+        }
+      ],
+      "total": 30
+    },
+    {
+      "billNo": "BC-20260302-2",
+      "time": "03/03/2026, 04:15:02",
+      "paymentMode": "Cash",
+      "items": [
+        {
+          "name": "Peri Peri Potato Twister",
+          "price": 30,
+          "quantity": 5
+        }
+      ],
+      "total": 150
+    }
+  ]
+}

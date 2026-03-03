@@ -1,0 +1,972 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8" />
+<title>BLOOM CAFE POS</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<div id="welcome-screen">
+  <h1>🌸 BLOOM CAFE</h1>
+  <h2>Premium POS System</h2>
+  <p>Owner: SARTHAK ADWANI</p>
+  <button id="enter-btn">Enter POS</button>
+</div>
+
+<div id="pos-app" style="display:none;">
+  <header>
+    <div class="header-content">
+      <h1>🌸 BLOOM CAFE POS</h1>
+      <div class="header-buttons">
+        <button onclick="openDashboard()">📊 Dashboard</button>
+        <button onclick="openInventoryManager()">📦 Inventory</button>
+        <button onclick="openMenuManager()">🍽️ Menu</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="container">
+    <div class="left-panel">
+      <h2>Categories</h2>
+      <div id="categoryList" class="category-list"></div>
+    </div>
+
+    <div class="center-panel">
+      <h2>Products</h2>
+      <div id="products" class="product-grid"></div>
+    </div>
+
+    <div class="right-panel">
+      <h2>🛒 Cart</h2>
+      <div id="cart-items" class="cart-items"></div>
+      <div class="cart-summary">
+        <h3>Total: ₹ <span id="total">0</span></h3>
+        <button class="primary-btn" onclick="openBillPreview()">💰 View Bill</button>
+        <button class="secondary-btn" onclick="clearCart()">🗑️ Clear Cart</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= ADD-ON SELECTION MODAL ================= -->
+<div id="addonModal" class="modal" style="display:none;">
+  <div class="modal-content">
+    <h2>Select Add-ons</h2>
+    <p id="addonProductName" class="product-name"></p>
+    <div id="addonOptions" class="addon-options"></div>
+    <div class="modal-buttons">
+      <button class="primary-btn" onclick="confirmAddons()">Add to Cart</button>
+      <button class="secondary-btn" onclick="closeAddonModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= BILL PREVIEW MODAL ================= -->
+<div id="billModal" class="modal" style="display:none;">
+  <div class="modal-content bill-preview">
+    <h2>💰 Bill Preview</h2>
+    <div id="billContent" class="bill-content"></div>
+    
+    <div class="payment-section">
+      <h3>Payment Mode</h3>
+      <div class="payment-options">
+        <label class="payment-option">
+          <input type="radio" name="paymentMode" value="Cash" checked>
+          <span>💵 Cash</span>
+        </label>
+        <label class="payment-option">
+          <input type="radio" name="paymentMode" value="UPI">
+          <span>📱 UPI</span>
+        </label>
+        <label class="payment-option">
+          <input type="radio" name="paymentMode" value="Card">
+          <span>💳 Card</span>
+        </label>
+      </div>
+    </div>
+    
+    <div class="modal-buttons">
+      <button class="primary-btn" onclick="saveBill()">✅ Save Bill</button>
+      <button class="secondary-btn" onclick="printBill()">🖨️ Print</button>
+      <button class="secondary-btn" onclick="closeBillPreview()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= DASHBOARD MODAL ================= -->
+<div id="dashboardModal" class="modal" style="display:none;">
+  <div class="modal-content dashboard-content">
+    <h2>📊 Dashboard</h2>
+    
+    <div class="date-selector">
+      <label>Select Date:</label>
+      <input type="date" id="dashboardDate" onchange="loadDashboardDate()">
+      <button onclick="loadTodaySales()">Today</button>
+    </div>
+    
+    <div class="dashboard-stats">
+      <div class="stat-card">
+        <h3>Total Revenue</h3>
+        <p>₹ <span id="dashRevenue">0</span></p>
+      </div>
+      <div class="stat-card">
+        <h3>Total Bills</h3>
+        <p><span id="dashBills">0</span></p>
+      </div>
+    </div>
+
+    <div class="dashboard-grid">
+      <div class="grid-item">
+        <h4>Top Selling Products</h4>
+        <div id="dashTopProducts" class="analytics-list"></div>
+      </div>
+      <div class="grid-item">
+        <h4>Sales by Category</h4>
+        <div id="dashCategorySales" class="analytics-list"></div>
+      </div>
+      <div class="grid-item">
+        <h4>Payment Modes</h4>
+        <div id="dashPaymentModes" class="analytics-list"></div>
+      </div>
+       <div class="grid-item low-stock-widget">
+        <h4>Low Stock Items</h4>
+        <div id="dashLowStock" class="analytics-list"></div>
+      </div>
+    </div>
+    
+    <h3>Bill List</h3>
+    <div id="billList" class="bill-list"></div>
+    
+    <button class="secondary-btn" onclick="closeDashboard()">Close</button>
+  </div>
+</div>
+
+<!-- ================= MENU MANAGEMENT MODAL ================= -->
+<div id="menuModal" class="modal" style="display:none;">
+  <div class="modal-content menu-management">
+    <h2>🍽️ Menu Management</h2>
+    
+    <div class="menu-tabs">
+      <button class="tab-btn active" onclick="showMenuTab('categories')">Categories</button>
+      <button class="tab-btn" onclick="showMenuTab('products')">Products</button>
+      <button class="tab-btn" onclick="showMenuTab('addons')">Add-ons</button>
+    </div>
+    
+    <!-- Categories Tab -->
+    <div id="menuCategoriesTab" class="menu-tab">
+      <div class="section-box">
+        <h3>Add Category</h3>
+        <div class="input-row">
+          <input type="text" id="newCategoryName" placeholder="Category Name">
+          <button onclick="addCategory()">Add</button>
+        </div>
+      </div>
+      <div class="section-box">
+        <h3>Existing Categories</h3>
+        <div id="categoryManagementList" class="item-list"></div>
+      </div>
+    </div>
+    
+    <!-- Products Tab -->
+    <div id="menuProductsTab" class="menu-tab" style="display:none;">
+      <div class="section-box">
+        <h3>Add Product</h3>
+        <div class="input-row">
+          <select id="productCategorySelect"></select>
+          <input type="text" id="newProductName" placeholder="Product Name">
+          <input type="number" id="newProductPrice" placeholder="Price">
+          <button onclick="addProduct()">Add</button>
+        </div>
+      </div>
+      <div class="section-box">
+        <h3>Edit Product Price</h3>
+        <div class="input-row">
+          <select id="editProductCategorySelect"></select>
+          <select id="editProductSelect"></select>
+          <input type="number" id="editProductPrice" placeholder="New Price">
+          <button onclick="editProductPrice()">Update</button>
+        </div>
+      </div>
+      <div class="section-box">
+        <h3>Delete Product</h3>
+        <div class="input-row">
+          <select id="deleteProductCategorySelect"></select>
+          <select id="deleteProductSelect"></select>
+          <button class="danger-btn" onclick="deleteProduct()">Delete</button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Add-ons Tab -->
+    <div id="menuAddonsTab" class="menu-tab" style="display:none;">
+      <div class="section-box">
+        <h3>Add Add-on to Product</h3>
+        <div class="input-row">
+          <select id="addonCategorySelect" onchange="updateAddonProductDropdown()"></select>
+          <select id="addonProductSelect"></select>
+          <input type="text" id="addonName" placeholder="Add-on Name">
+          <input type="number" id="addonPrice" placeholder="Price">
+          <button onclick="addAddon()">Add</button>
+        </div>
+      </div>
+      <div class="section-box">
+        <h3>Remove Add-on</h3>
+        <div class="input-row">
+          <select id="removeAddonCategorySelect" onchange="updateRemoveAddonProductDropdown()"></select>
+          <select id="removeAddonProductSelect" onchange="updateRemoveAddonDropdown()"></select>
+          <select id="removeAddonSelect"></select>
+          <button class="danger-btn" onclick="removeAddon()">Remove</button>
+        </div>
+      </div>
+    </div>
+    
+    <button class="secondary-btn" onclick="closeMenuManager()">Close</button>
+  </div>
+</div>
+
+<!-- ================= INVENTORY MANAGEMENT MODAL ================= -->
+<div id="inventoryModal" class="modal" style="display:none;">
+  <div class="modal-content inventory-content">
+    <h2>📦 Inventory Management</h2>
+    
+    <div class="section-box">
+      <h3>Add Inventory Item</h3>
+      <div class="input-row">
+        <input type="text" id="invItemName" placeholder="Item Name">
+        <input type="number" id="invItemStock" placeholder="Stock" value="50">
+        <input type="number" id="invItemLowStock" placeholder="Low Stock Alert" value="5">
+        <button onclick="addInventoryItem()">Add</button>
+      </div>
+    </div>
+    
+    <h3>Current Inventory</h3>
+    <div id="inventoryList" class="inventory-list"></div>
+    
+    <button class="secondary-btn" onclick="closeInventoryManager()">Close</button>
+  </div>
+</div>
+
+<script>
+const { ipcRenderer } = require("electron");
+
+let currentMenu = [];
+let cart = [];
+let pendingProduct = null;
+let selectedAddons = [];
+
+// ================= INITIALIZATION =================
+document.getElementById("enter-btn").onclick = async () => {
+  document.getElementById("welcome-screen").style.display = "none";
+  document.getElementById("pos-app").style.display = "block";
+  await loadCategories();
+};
+
+// ================= MENU FUNCTIONS =================
+async function loadCategories() {
+  const menu = await ipcRenderer.invoke("get-menu");
+  currentMenu = menu.categories;
+  
+  const div = document.getElementById("categoryList");
+  div.innerHTML = "";
+  currentMenu.forEach(cat => {
+    const btn = document.createElement("button");
+    btn.className = "category-btn";
+    btn.innerText = cat.name;
+    btn.onclick = () => loadProducts(cat.name);
+    div.appendChild(btn);
+  });
+  
+  if (currentMenu.length > 0) {
+    loadProducts(currentMenu[0].name);
+  }
+  
+  refreshManagerDropdowns();
+}
+
+function loadProducts(categoryName) {
+  const category = currentMenu.find(c => c.name === categoryName);
+  if (!category) return;
+  
+  const div = document.getElementById("products");
+  div.innerHTML = "";
+  
+  category.products.forEach(product => {
+    const card = document.createElement("div");
+    card.className = "product-card";
+    card.innerHTML = `
+      <h4>${product.name}</h4>
+      <p class="price">₹${product.price}</p>
+      ${product.addons && product.addons.length > 0 ? '<p class="has-addons">+ Add-ons available</p>' : ''}
+    `;
+    card.onclick = () => addToCart(product);
+    div.appendChild(card);
+  });
+}
+
+// ================= CART FUNCTIONS =================
+function addToCart(product) {
+  if (product.addons && product.addons.length > 0) {
+    // Show addon selection modal
+    pendingProduct = product;
+    selectedAddons = [];
+    document.getElementById("addonProductName").innerText = product.name + " - ₹" + product.price;
+    
+    const optionsDiv = document.getElementById("addonOptions");
+    optionsDiv.innerHTML = "";
+    
+    product.addons.forEach(addon => {
+      const label = document.createElement("label");
+      label.className = "addon-checkbox";
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.value = addon.name;
+      checkbox.dataset.price = addon.price;
+
+      const span = document.createElement('span');
+      span.textContent = `${addon.name} (+₹${addon.price})`;
+
+      label.appendChild(checkbox);
+      label.appendChild(span);
+      optionsDiv.appendChild(label);
+    });
+    
+    document.getElementById("addonModal").style.display = "block";
+  } else {
+    // Add directly to cart
+    addToCartWithAddons(product, []);
+  }
+}
+
+function addToCartWithAddons(product, addons) {
+  // Calculate total price with addons
+  const addonTotal = addons.reduce((sum, a) => sum + a.price, 0);
+  const totalPrice = product.price + addonTotal;
+  
+  // Create cart item key based on product name and addons
+  const addonNames = addons.map(a => a.name).sort().join(",");
+  const cartKey = `${product.name}|${addonNames}`;
+  
+  // Check if same item with same addons exists
+  const existingIndex = cart.findIndex(item => item.cartKey === cartKey);
+  
+  if (existingIndex >= 0) {
+    cart[existingIndex].quantity += 1;
+  } else {
+    cart.push({
+      cartKey: cartKey,
+      name: product.name,
+      basePrice: product.price,
+      addons: addons,
+      totalPrice: totalPrice,
+      quantity: 1
+    });
+  }
+  
+  renderCart();
+}
+
+function confirmAddons() {
+  const checkboxes = document.querySelectorAll("#addonOptions input:checked");
+  const selected = Array.from(checkboxes).map(cb => ({
+    name: cb.value,
+    price: parseFloat(cb.dataset.price)
+  }));
+  
+  closeAddonModal();
+  addToCartWithAddons(pendingProduct, selected);
+}
+
+function closeAddonModal() {
+  document.getElementById("addonModal").style.display = "none";
+  pendingProduct = null;
+  selectedAddons = [];
+}
+
+function renderCart() {
+  const div = document.getElementById("cart-items");
+  const totalSpan = document.getElementById("total");
+  div.innerHTML = "";
+  let total = 0;
+  
+  cart.forEach((item, index) => {
+    const itemTotal = item.totalPrice * item.quantity;
+    total += itemTotal;
+    
+    let addonsHtml = "";
+    if (item.addons && item.addons.length > 0) {
+      addonsHtml = `<div class="cart-addons">${item.addons.map(a => `+ ${a.name} (₹${a.price})`).join(", ")}</div>`;
+    }
+    
+    const row = document.createElement("div");
+    row.className = "cart-item";
+    row.innerHTML = `
+      <div class="cart-item-info">
+        <strong>${item.name}</strong>
+        ${addonsHtml}
+        <span class="item-price">₹${item.totalPrice} × ${item.quantity}</span>
+      </div>
+      <div class="cart-item-actions">
+        <button class="qty-btn" onclick="increaseQty(${index})">+</button>
+        <span class="qty">${item.quantity}</span>
+        <button class="qty-btn" onclick="decreaseQty(${index})">-</button>
+      </div>
+    `;
+    div.appendChild(row);
+  });
+  
+  totalSpan.innerText = total;
+}
+
+function increaseQty(index) {
+  cart[index].quantity++;
+  renderCart();
+}
+
+function decreaseQty(index) {
+  cart[index].quantity--;
+  if (cart[index].quantity <= 0) {
+    cart.splice(index, 1);
+  }
+  renderCart();
+}
+
+function clearCart() {
+  cart = [];
+  renderCart();
+}
+
+// ================= BILL PREVIEW =================
+async function openBillPreview() {
+  if (cart.length === 0) {
+    alert("Cart is empty!");
+    return;
+  }
+  
+  const billNo = await ipcRenderer.invoke("get-next-bill-number");
+  const today = new Date().toISOString().slice(0, 10);
+  const fullBillNo = `BC-${today.replace(/-/g, "")}-${billNo}`;
+  
+  let total = 0;
+  let itemsHtml = "";
+  
+  cart.forEach(item => {
+    const itemTotal = item.totalPrice * item.quantity;
+    total += itemTotal;
+    
+    let addonsText = "";
+    if (item.addons && item.addons.length > 0) {
+      addonsText = `<div class="bill-addons">${item.addons.map(a => `&nbsp;&nbsp;+ ${a.name} ₹${a.price}`).join("<br>")}</div>`;
+    }
+    
+    itemsHtml += `
+      <tr>
+        <td>${item.name}${addonsText}</td>
+        <td>${item.quantity}</td>
+        <td>₹${item.totalPrice}</td>
+        <td>₹${itemTotal}</td>
+      </tr>
+    `;
+  });
+  
+  const billContent = document.getElementById("billContent");
+  billContent.innerHTML = `
+    <div class="bill-header">
+      <h3>🌸 BLOOM CAFE</h3>
+      <p>Bill No: ${fullBillNo}</p>
+      <p>Date: ${new Date().toLocaleString()}</p>
+    </div>
+    <table class="bill-table">
+      <thead>
+        <tr>
+          <th>Item</th>
+          <th>Qty</th>
+          <th>Price</th>
+          <th>Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${itemsHtml}
+      </tbody>
+      <tfoot>
+        <tr>
+          <td colspan="3"><strong>Total</strong></td>
+          <td><strong>₹${total}</strong></td>
+        </tr>
+      </tfoot>
+    </table>
+  `;
+  
+  document.getElementById("billModal").style.display = "block";
+}
+
+function closeBillPreview() {
+  document.getElementById("billModal").style.display = "none";
+}
+
+async function saveBill() {
+  const paymentMode = document.querySelector('input[name="paymentMode"]:checked').value;
+  
+  let total = 0;
+  const items = cart.map(item => {
+    const itemTotal = item.totalPrice * item.quantity;
+    total += itemTotal;
+    return {
+      name: item.name,
+      price: item.totalPrice,
+      quantity: item.quantity,
+      addons: item.addons
+    };
+  });
+  
+  const bill = {
+    items: items,
+    total: total,
+    paymentMode: paymentMode
+  };
+  
+  ipcRenderer.send("save-bill", bill);
+  
+  // Reload inventory after saving
+  await loadCategories();
+  
+  closeBillPreview();
+  clearCart();
+  alert("Bill saved successfully!");
+}
+
+function printBill() {
+  window.print();
+}
+
+// ================= DASHBOARD =================
+async function openDashboard() {
+  const today = new Date().toISOString().slice(0, 10);
+  document.getElementById("dashboardDate").value = today;
+  await loadDashboardDate();
+  document.getElementById("dashboardModal").style.display = "block";
+}
+
+async function loadDashboardDate() {
+  const date = document.getElementById("dashboardDate").value;
+  if (!date) return;
+  
+  const salesData = await ipcRenderer.invoke("get-sales-by-date", date);
+  const analytics = await ipcRenderer.invoke("get-dashboard-analytics", date);
+  const lowStockItems = await ipcRenderer.invoke("get-low-stock-items");
+
+  // Basic stats
+  document.getElementById("dashRevenue").innerText = salesData.totalRevenue || 0;
+  document.getElementById("dashBills").innerText = salesData.totalBills || 0;
+  
+  // Top Selling Products
+  const topProductsDiv = document.getElementById("dashTopProducts");
+  topProductsDiv.innerHTML = "";
+  if (analytics.topSellingProducts.length > 0) {
+    analytics.topSellingProducts.forEach(p => {
+      topProductsDiv.innerHTML += `<div class="analytics-item"><span>${p.name}</span><span>${p.quantity} sold</span></div>`;
+    });
+  } else {
+    topProductsDiv.innerHTML = "<p class='no-data'>No sales data</p>";
+  }
+
+  // Sales by Category
+  const categorySalesDiv = document.getElementById("dashCategorySales");
+  categorySalesDiv.innerHTML = "";
+  if (analytics.salesByCategory.length > 0) {
+    analytics.salesByCategory.forEach(c => {
+      categorySalesDiv.innerHTML += `<div class="analytics-item"><span>${c.name}</span><span>₹${c.revenue}</span></div>`;
+    });
+  } else {
+    categorySalesDiv.innerHTML = "<p class='no-data'>No sales data</p>";
+  }
+
+  // Payment Modes
+  const paymentModesDiv = document.getElementById("dashPaymentModes");
+  paymentModesDiv.innerHTML = "";
+  const paymentModes = analytics.paymentModeDistribution;
+  if (Object.keys(paymentModes).length > 0) {
+    for (const [mode, count] of Object.entries(paymentModes)) {
+      paymentModesDiv.innerHTML += `<div class="analytics-item"><span>${mode}</span><span>${count} bills</span></div>`;
+    }
+  } else {
+    paymentModesDiv.innerHTML = "<p class='no-data'>No sales data</p>";
+  }
+  
+    // Low Stock Items
+  const lowStockDiv = document.getElementById("dashLowStock");
+  lowStockDiv.innerHTML = "";
+  if (lowStockItems.length > 0) {
+    lowStockItems.forEach(item => {
+      lowStockDiv.innerHTML += `<div class="analytics-item low-stock-alert"><span>${item.name}</span><span>Stock: ${item.stock}</span></div>`;
+    });
+  } else {
+    lowStockDiv.innerHTML = "<p class='no-data'>All items are in stock</p>";
+  }
+
+
+  // Bill List
+  const billList = document.getElementById("billList");
+  billList.innerHTML = "";
+  
+  if (salesData.bills && salesData.bills.length > 0) {
+    salesData.bills.forEach(bill => {
+      const billDiv = document.createElement("div");
+      billDiv.className = "bill-item";
+      billDiv.innerHTML = `
+        <div class="bill-header-row" onclick="toggleBillExpand('${bill.billNo}')">
+          <span><strong>${bill.billNo}</strong></span>
+          <span>${bill.time}</span>
+          <span>₹${bill.total}</span>
+          <span class="payment-badge">${bill.paymentMode || 'Cash'}</span>
+        </div>
+        <div id="bill-${bill.billNo}" class="bill-details" style="display:none;">
+          <table>
+            ${bill.items.map(item => `
+              <tr>
+                <td>${item.name}${item.addons && item.addons.length > 0 ? '<br><small>' + item.addons.map(a => '+ ' + a.name).join(', ') + '</small>' : ''}</td>
+                <td>×${item.quantity}</td>
+                <td>₹${item.price * item.quantity}</td>
+              </tr>
+            `).join('')}
+          </table>
+          <button class="danger-btn" onclick="deleteBill('${bill.billNo}')">Delete Bill</button>
+        </div>
+      `;
+      billList.appendChild(billDiv);
+    });
+  } else {
+    billList.innerHTML = "<p class='no-data'>No bills for this date</p>";
+  }
+}
+
+async function loadTodaySales() {
+  const today = new Date().toISOString().slice(0, 10);
+  document.getElementById("dashboardDate").value = today;
+  await loadDashboardDate();
+}
+
+function toggleBillExpand(billNo) {
+  const details = document.getElementById(`bill-${billNo}`);
+  if (details.style.display === "none") {
+    details.style.display = "block";
+  } else {
+    details.style.display = "none";
+  }
+}
+
+async function deleteBill(billNo) {
+  if (!confirm("Are you sure you want to delete this bill? Stock will be restored.")) {
+    return;
+  }
+  
+  await ipcRenderer.invoke("delete-bill", billNo);
+  await loadDashboardDate();
+  await loadCategories();
+}
+
+function closeDashboard() {
+  document.getElementById("dashboardModal").style.display = "none";
+}
+
+// ================= MENU MANAGEMENT =================
+function openMenuManager() {
+  document.getElementById("menuModal").style.display = "block";
+  refreshManagerDropdowns();
+}
+
+function closeMenuManager() {
+  document.getElementById("menuModal").style.display = "none";
+}
+
+function showMenuTab(tab) {
+  document.querySelectorAll(".menu-tab").forEach(t => t.style.display = "none");
+  document.querySelectorAll(".menu-tabs .tab-btn").forEach(b => b.classList.remove("active"));
+  
+  document.getElementById(`menu${tab.charAt(0).toUpperCase() + tab.slice(1)}Tab`).style.display = "block";
+  event.target.classList.add("active");
+}
+
+async function refreshManagerDropdowns() {
+  const menu = await ipcRenderer.invoke("get-menu");
+  currentMenu = menu.categories;
+  
+  // Product category dropdowns
+  const productCatSelect = document.getElementById("productCategorySelect");
+  const editProductCatSelect = document.getElementById("editProductCategorySelect");
+  const deleteProductCatSelect = document.getElementById("deleteProductCategorySelect");
+  const addonCatSelect = document.getElementById("addonCategorySelect");
+  const removeAddonCatSelect = document.getElementById("removeAddonCategorySelect");
+  
+  [productCatSelect, editProductCatSelect, deleteProductCatSelect, addonCatSelect, removeAddonCatSelect].forEach(sel => {
+    if (sel) {
+      sel.innerHTML = "";
+      currentMenu.forEach(cat => {
+        sel.innerHTML += `<option value="${cat.name}">${cat.name}</option>`;
+      });
+    }
+  });
+  
+  // Category management list
+  const catList = document.getElementById("categoryManagementList");
+  catList.innerHTML = "";
+  currentMenu.forEach(cat => {
+    const div = document.createElement("div");
+    div.className = "manage-item";
+    div.innerHTML = `
+      <span>${cat.name} (${cat.products.length} products)</span>
+      <button class="danger-btn" onclick="deleteCategory('${cat.name}')">Delete</button>
+    `;
+    catList.appendChild(div);
+  });
+  
+  // Product dropdowns for edit/delete
+  updateEditProductDropdown();
+  updateDeleteProductDropdown();
+  updateAddonProductDropdown();
+  updateRemoveAddonProductDropdown();
+}
+
+function updateEditProductDropdown() {
+  const category = document.getElementById("editProductCategorySelect").value;
+  const productSelect = document.getElementById("editProductSelect");
+  productSelect.innerHTML = "";
+  
+  const categoryObj = currentMenu.find(c => c.name === category);
+  if (categoryObj) {
+    categoryObj.products.forEach(p => {
+      productSelect.innerHTML += `<option value="${p.name}">${p.name} - ₹${p.price}</option>`;
+    });
+  }
+}
+
+function updateDeleteProductDropdown() {
+  const category = document.getElementById("deleteProductCategorySelect").value;
+  const productSelect = document.getElementById("deleteProductSelect");
+  productSelect.innerHTML = "";
+  
+  const categoryObj = currentMenu.find(c => c.name === category);
+  if (categoryObj) {
+    categoryObj.products.forEach(p => {
+      productSelect.innerHTML += `<option value="${p.name}">${p.name}</option>`;
+    });
+  }
+}
+
+document.getElementById("editProductCategorySelect").addEventListener("change", updateEditProductDropdown);
+document.getElementById("deleteProductCategorySelect").addEventListener("change", updateDeleteProductDropdown);
+
+async function addCategory() {
+  const name = document.getElementById("newCategoryName").value;
+  if (!name) return;
+  
+  await ipcRenderer.invoke("add-category", name);
+  document.getElementById("newCategoryName").value = "";
+  await loadCategories();
+}
+
+async function deleteCategory(categoryName) {
+  if (!confirm(`Delete category "${categoryName}"?`)) return;
+  
+  await ipcRenderer.invoke("delete-category", categoryName);
+  await loadCategories();
+}
+
+async function addProduct() {
+  const category = document.getElementById("productCategorySelect").value;
+  const name = document.getElementById("newProductName").value;
+  const price = parseFloat(document.getElementById("newProductPrice").value);
+  
+  if (!category || !name || !price) {
+    alert("Please fill all fields");
+    return;
+  }
+  
+  await ipcRenderer.invoke("add-product", category, {
+    name: name,
+    price: price,
+    addons: []
+  });
+  
+  document.getElementById("newProductName").value = "";
+  document.getElementById("newProductPrice").value = "";
+  await loadCategories();
+}
+
+async function editProductPrice() {
+  const category = document.getElementById("editProductCategorySelect").value;
+  const productName = document.getElementById("editProductSelect").value;
+  const newPrice = parseFloat(document.getElementById("editProductPrice").value);
+  
+  if (!category || !productName || !newPrice) {
+    alert("Please fill all fields");
+    return;
+  }
+  
+  await ipcRenderer.invoke("edit-product-price", category, productName, newPrice);
+  document.getElementById("editProductPrice").value = "";
+  await loadCategories();
+  alert("Price updated!");
+}
+
+async function deleteProduct() {
+  const category = document.getElementById("deleteProductCategorySelect").value;
+  const productName = document.getElementById("deleteProductSelect").value;
+  
+  if (!category || !productName) {
+    alert("Please select a product");
+    return;
+  }
+  
+  if (!confirm(`Delete product "${productName}"?`)) return;
+  
+  await ipcRenderer.invoke("delete-product", category, productName);
+  await loadCategories();
+}
+
+function updateAddonProductDropdown() {
+  const category = document.getElementById("addonCategorySelect").value;
+  const productSelect = document.getElementById("addonProductSelect");
+  productSelect.innerHTML = "";
+  
+  const categoryObj = currentMenu.find(c => c.name === category);
+  if (categoryObj) {
+    categoryObj.products.forEach(p => {
+      productSelect.innerHTML += `<option value="${p.name}">${p.name}</option>`;
+    });
+  }
+}
+
+async function addAddon() {
+  const category = document.getElementById("addonCategorySelect").value;
+  const productName = document.getElementById("addonProductSelect").value;
+  const name = document.getElementById("addonName").value;
+  const price = parseFloat(document.getElementById("addonPrice").value);
+  
+  if (!category || !productName || !name || !price) {
+    alert("Please fill all fields");
+    return;
+  }
+  
+  await ipcRenderer.invoke("add-addon", category, productName, { name, price });
+  
+  document.getElementById("addonName").value = "";
+  document.getElementById("addonPrice").value = "";
+  await loadCategories();
+  alert("Add-on added!");
+}
+
+function updateRemoveAddonProductDropdown() {
+  const category = document.getElementById("removeAddonCategorySelect").value;
+  const productSelect = document.getElementById("removeAddonProductSelect");
+  productSelect.innerHTML = "";
+  
+  const cat = currentMenu.find(c => c.name === category);
+  if (cat) {
+    // Filter for products that have addons
+    const productsWithAddons = cat.products.filter(p => p.addons && p.addons.length > 0);
+    productsWithAddons.forEach(p => {
+      productSelect.innerHTML += `<option value="${p.name}">${p.name}</option>`;
+    });
+  }
+  // Automatically update the next dropdown, using a timeout to prevent a race condition
+          // where the DOM hasn't updated the product dropdown's value yet.
+          setTimeout(updateRemoveAddonDropdown, 0);
+        }
+
+function updateRemoveAddonDropdown() {
+  const category = document.getElementById("removeAddonCategorySelect").value;
+  const productName = document.getElementById("removeAddonProductSelect").value;
+  const addonSelect = document.getElementById("removeAddonSelect");
+  addonSelect.innerHTML = "";
+
+  const cat = currentMenu.find(c => c.name === category);
+  if (cat) {
+    const product = cat.products.find(p => p.name === productName);
+    if (product && product.addons) {
+      product.addons.forEach(addon => {
+        addonSelect.innerHTML += `<option value="${addon.name}">${addon.name} (₹${addon.price})</option>`;
+      });
+    }
+  }
+}
+
+document.getElementById("removeAddonProductSelect").addEventListener("change", updateRemoveAddonDropdown);
+
+async function removeAddon() {
+  const category = document.getElementById("removeAddonCategorySelect").value;
+  const productName = document.getElementById("removeAddonProductSelect").value;
+  const addonName = document.getElementById("removeAddonSelect").value;
+  
+  if (!category || !productName || !addonName) {
+    alert("Please select an add-on to remove");
+    return;
+  }
+  
+  await ipcRenderer.invoke("remove-addon", category, productName, addonName);
+  await loadCategories();
+  alert("Add-on removed!");
+}
+
+// ================= INVENTORY MANAGEMENT =================
+async function openInventoryManager() {
+  await loadInventoryList();
+  document.getElementById("inventoryModal").style.display = "block";
+}
+
+function closeInventoryManager() {
+  document.getElementById("inventoryModal").style.display = "none";
+}
+
+async function loadInventoryList() {
+  const inventory = await ipcRenderer.invoke("get-inventory");
+  
+  const list = document.getElementById("inventoryList");
+  list.innerHTML = "";
+  
+  if (inventory.items && inventory.items.length > 0) {
+    inventory.items.forEach(item => {
+      const isLowStock = item.stock <= item.lowStock;
+      const div = document.createElement("div");
+      div.className = `inventory-item ${isLowStock ? 'low-stock' : ''}`;
+      div.innerHTML = `
+        <div class="inv-info">
+          <h4>${item.name}</h4>
+          <p>Stock: <input type="number" value="${item.stock}" onchange="updateStock('${item.name}', this.value)" class="stock-input"> / Low: ${item.lowStock}</p>
+          ${isLowStock ? '<span class="low-stock-warning">⚠️ Low Stock!</span>' : ''}
+        </div>
+      `;
+      list.appendChild(div);
+    });
+  } else {
+    list.innerHTML = "<p class='no-data'>No inventory items</p>";
+  }
+}
+
+async function updateStock(name, newStock) {
+  await ipcRenderer.invoke("update-stock", name, newStock);
+  await loadInventoryList();
+  await loadCategories();
+}
+
+async function addInventoryItem() {
+  const name = document.getElementById("invItemName").value;
+  const stock = parseInt(document.getElementById("invItemStock").value) || 50;
+  const lowStock = parseInt(document.getElementById("invItemLowStock").value) || 5;
+  
+  if (!name) {
+    alert("Please enter item name");
+    return;
+  }
+  
+  await ipcRenderer.invoke("add-inventory-item", { name, stock, lowStock });
+  
+  document.getElementById("invItemName").value = "";
+  await loadInventoryList();
+  await loadCategories();
+  alert("Inventory item added!");
+}
+</script>
+
+</body>
+</html>

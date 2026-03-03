@@ -1,0 +1,36 @@
+{
+  "name": "bloom-cafe-pos",
+  "version": "1.0.0",
+  "description": "",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "electron": "^40.6.1",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.example.bloomcafepos",
+    "productName": "Bloom Cafe POS",
+    "files": [
+      "main.js",
+      "index.html",
+      "style.css",
+      "menu.json",
+      "inventory.json"
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}

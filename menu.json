@@ -1,0 +1,43 @@
+{
+  "categories": [
+    {
+      "name": "Twister",
+      "products": [
+        {
+          "name": "cotton",
+          "price": 50,
+          "addons": []
+        }
+      ]
+    },
+    {
+      "name": "Fries",
+      "products": [
+        {
+          "name": "Freedom Fries",
+          "price": 40,
+          "addons": [
+            {
+              "name": "cheese",
+              "price": 90
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "kulfi",
+      "products": [
+        {
+          "name": "nhi milegi kulfi",
+          "price": 69,
+          "addons": []
+        }
+      ]
+    },
+    {
+      "name": "bhi",
+      "products": []
+    }
+  ]
+}
