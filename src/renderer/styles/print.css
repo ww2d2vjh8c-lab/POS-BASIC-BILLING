@@ -1,0 +1,74 @@
+/* ==============================
+   THERMAL PRINTER STYLES
+   ============================== */
+
+@media print {
+  @page {
+    size: 58mm auto;
+    margin: 0;
+  }
+
+  html, body {
+    width: 58mm;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  body * { visibility: hidden; }
+  #billContent, #billContent * { visibility: visible; }
+
+  #billContent {
+    position: static;
+    width: 56mm;
+    padding: 1mm;
+    margin: 0;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 10px;
+    line-height: 1.4;
+    color: #000 !important;
+    background: #fff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .receipt-wrap {
+    width: 56mm;
+    max-width: 56mm;
+    font-size: 10px;
+    word-break: break-word;
+    overflow: hidden;
+  }
+
+  .receipt-title-main { font-size: 13px; }
+  .receipt-tax-title { font-size: 11px; }
+  .receipt-divider { font-size: 10px; }
+  .receipt-phone { font-size: 9px; }
+  .receipt-details { font-size: 9px; }
+  .receipt-table th { font-size: 9px; }
+  .receipt-table td { font-size: 10px; }
+  .receipt-total-row { font-size: 10px; }
+  .receipt-footer-text { font-size: 10px; }
+  .receipt-footer-sub { font-size: 10px; }
+
+  body > *:not(#billModal) { display: none !important; }
+  #billModal {
+    display: block !important;
+    position: fixed;
+    top: 0; left: 0;
+    background: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 58mm !important;
+  }
+  .modal-content {
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: none !important;
+    width: 58mm !important;
+  }
+  .modal-buttons, .payment-section,
+  .bill-actions, h2, button { display: none !important; }
+}
+

@@ -1,0 +1,866 @@
+/* ===== DASHBOARD MODAL ===== */
+.dash-modal-content {
+  max-width: 900px;
+  width: 96vw;
+  max-height: 92vh;
+  overflow-y: auto;
+  padding: 0;
+  border-radius: 16px;
+}
+
+.dash-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 18px 24px;
+  background: linear-gradient(135deg, #3C2A21 0%, #6B3F26 100%);
+  border-radius: 16px 16px 0 0;
+  gap: 12px;
+}
+
+.dash-header-left h2 {
+  margin: 0;
+  color: white;
+  font-size: 20px;
+}
+
+.dash-subtitle {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  display: block;
+  margin-top: 2px;
+}
+
+.dash-header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dash-date-input {
+  padding: 8px 12px;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  background: rgba(255, 255, 255, 0.15);
+  color: white;
+  cursor: pointer;
+  outline: none;
+}
+
+.dash-date-input::-webkit-calendar-picker-indicator { filter: invert(1); }
+
+.dash-export-btn {
+  padding: 8px 14px;
+  background: rgba(255, 255, 255, 0.15);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  transition: background 0.2s;
+}
+
+.dash-export-btn:hover { background: rgba(255, 255, 255, 0.25); }
+
+/* Stat Cards — 5 columns now */
+.dash-stat-cards {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0;
+  border-bottom: 1px solid #f0e8d8;
+}
+
+.dash-stat-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 20px;
+  border-right: 1px solid #f0e8d8;
+  background: white;
+  transition: background 0.15s;
+}
+
+.dash-stat-card:last-child { border-right: none; }
+.dash-stat-card:hover { background: #fdf9f3; }
+
+.dash-card-icon {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.dash-card-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: #3C2A21;
+  line-height: 1;
+}
+
+.dash-card-label {
+  font-size: 11px;
+  color: #999;
+  margin-top: 4px;
+  font-weight: 500;
+}
+
+.dash-card-revenue .dash-card-value { color: #2e7d32; }
+.dash-card-bills .dash-card-value { color: #1565c0; }
+.dash-card-avg .dash-card-value { color: #e65100; }
+.dash-card-items .dash-card-value { color: #6a1b9a; }
+
+/* Main Grid */
+.dash-grid {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  grid-template-rows: auto auto;
+  gap: 1px;
+  background: #f0e8d8;
+  border-bottom: 1px solid #f0e8d8;
+}
+
+.dash-panel {
+  background: white;
+  padding: 18px 20px;
+}
+
+.dash-panel-chart {
+  grid-row: 1 / 3;
+}
+
+.dash-panel-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #3C2A21;
+  margin: 0 0 14px 0;
+}
+
+/* Bar Chart */
+.dash-chart-container {
+  height: 200px;
+  display: flex;
+  flex-direction: column;
+}
+
+.dash-chart {
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding-bottom: 4px;
+}
+
+.dash-bar-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  height: 100%;
+  gap: 4px;
+}
+
+.dash-bar-value {
+  font-size: 9px;
+  color: #888;
+  font-weight: 600;
+  text-align: center;
+  min-height: 12px;
+}
+
+.dash-bar {
+  width: 100%;
+  background: #e0d5c5;
+  border-radius: 4px 4px 0 0;
+  min-height: 3px;
+  transition: height 0.4s ease;
+}
+
+.dash-bar-today { background: #c17f24; }
+
+.dash-chart-labels {
+  display: flex;
+  gap: 8px;
+  border-top: 1px solid #f0e8d8;
+  padding-top: 6px;
+}
+
+.dash-chart-label {
+  flex: 1;
+  text-align: center;
+  font-size: 10px;
+  color: #aaa;
+  font-weight: 500;
+}
+
+.dash-label-today {
+  color: #c17f24;
+  font-weight: 700;
+}
+
+/* Payment Breakdown */
+.dash-payment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.dash-payment-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dash-payment-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.dash-payment-mode {
+  font-size: 13px;
+  font-weight: 600;
+  color: #3C2A21;
+  width: 45px;
+  flex-shrink: 0;
+}
+
+.dash-payment-bar-wrap {
+  flex: 1;
+  height: 8px;
+  background: #f0e8d8;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.dash-payment-bar {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.4s ease;
+}
+
+.dash-payment-amount {
+  font-size: 12px;
+  font-weight: 600;
+  color: #3C2A21;
+  width: 55px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.dash-payment-pct {
+  font-size: 11px;
+  color: #999;
+  width: 32px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* Top Items */
+.dash-top-items-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dash-top-item-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dash-top-medal {
+  font-size: 14px;
+  width: 20px;
+  flex-shrink: 0;
+}
+
+.dash-top-name {
+  font-size: 13px;
+  color: #3C2A21;
+  font-weight: 500;
+  width: 90px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.dash-top-bar-wrap {
+  flex: 1;
+  height: 6px;
+  background: #f0e8d8;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.dash-top-bar {
+  height: 100%;
+  background: #c17f24;
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+
+.dash-top-qty {
+  font-size: 11px;
+  font-weight: 700;
+  color: #c17f24;
+  width: 28px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.dash-top-rev {
+  font-size: 11px;
+  color: #999;
+  width: 45px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* Settings Row */
+.dash-settings-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: #f0e8d8;
+  border-top: 1px solid #f0e8d8;
+}
+
+.dash-settings-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 22px;
+  background: #fdf9f3;
+}
+
+.dash-settings-label {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 600;
+  color: #3C2A21;
+}
+
+.dash-settings-control {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.dash-count-btn {
+  width: 32px;
+  height: 32px;
+  border: 2px solid #e0d5c5;
+  border-radius: 8px;
+  background: white;
+  font-size: 18px;
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #3C2A21;
+  transition: all 0.15s;
+}
+
+.dash-count-btn:hover { background: #f0e8d8; border-color: #c17f24; }
+
+.dash-count-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: #3C2A21;
+  min-width: 32px;
+  text-align: center;
+}
+
+.dash-empty {
+  color: #bbb;
+  font-size: 13px;
+  text-align: center;
+  padding: 16px 0;
+}
+
+/* ── Date navigation (Prev / Next buttons) ──────────────────── */
+.dash-date-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dash-nav-btn {
+  padding: 6px 11px;
+  background: rgba(255,255,255,0.15);
+  color: white;
+  border: 1px solid rgba(255,255,255,0.25);
+  border-radius: 7px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+.dash-nav-btn:hover { background: rgba(255,255,255,0.3); }
+.dash-nav-btn:disabled { opacity: 0.35; cursor: default; pointer-events: none; }
+.dash-today-btn {
+  padding: 6px 12px;
+  background: rgba(255,255,255,0.2);
+  color: white;
+  border: 1px solid rgba(255,255,255,0.35);
+  border-radius: 7px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  transition: background 0.15s;
+}
+.dash-today-btn:hover { background: rgba(255,255,255,0.35); }
+
+/* ── Live strip ──────────────────────────────────────────────── */
+.dash-live-strip {
+  padding: 7px 24px;
+  background: #e8f5e9;
+  border-bottom: 1px solid #c8e6c9;
+  font-size: 13px;
+  font-weight: 600;
+  color: #2e7d32;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.dash-live-strip.hidden { display: none; }
+
+/* ── Delta indicator on stat cards ──────────────────────────── */
+.dash-card-delta {
+  font-size: 11px;
+  font-weight: 600;
+  margin-top: 3px;
+  min-height: 14px;
+}
+.dash-card-delta.up   { color: #43a047; }
+.dash-card-delta.down { color: #e53935; }
+.dash-card-delta.flat { color: #aaa; }
+
+/* ── Taller chart ────────────────────────────────────────────── */
+.dash-chart-container { height: 260px; }
+
+/* ── Flat bill rows ──────────────────────────────────────────── */
+.dash-bill-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border-bottom: 1px solid #f0e8d8;
+  transition: background 0.12s;
+}
+.dash-bill-row:last-child { border-bottom: none; }
+.dash-bill-row:hover      { background: #fdf9f3; }
+
+.dash-bill-no {
+  font-size: 13px;
+  font-weight: 700;
+  color: #3C2A21;
+  width: 46px;
+  flex-shrink: 0;
+}
+.dash-bill-time {
+  font-size: 12px;
+  color: #aaa;
+  width: 48px;
+  flex-shrink: 0;
+}
+.dash-bill-table {
+  font-size: 13px;
+  color: #666;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dash-bill-amount {
+  font-size: 14px;
+  font-weight: 700;
+  color: #3C2A21;
+  width: 64px;
+  text-align: right;
+  flex-shrink: 0;
+}
+.dash-bill-badge {
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 10px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.dash-bill-badge-cash  { background: #e8f5e9; color: #2e7d32; }
+.dash-bill-badge-upi   { background: #e3f2fd; color: #1565c0; }
+.dash-bill-badge-card  { background: #f3e5f5; color: #6a1b9a; }
+.dash-bill-badge-other { background: #fff3e0; color: #e65100; }
+
+.dash-bill-actions {
+  display: flex;
+  gap: 5px;
+  flex-shrink: 0;
+}
+.dash-bill-btn {
+  padding: 4px 9px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  transition: background 0.12s;
+}
+.dash-bill-reprint         { background: #e8f5e9; color: #2e7d32; }
+.dash-bill-reprint:hover   { background: #4CAF50; color: white; }
+.dash-bill-delete          { background: #fdecea; color: #e53935; }
+.dash-bill-delete:hover    { background: #e53935; color: white; }
+
+.bill-list { max-height: 320px; overflow-y: auto; }
+
+.dashboard-stats {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.stat-card {
+  flex: 1;
+  background: #fff;
+  border: 1px solid #EAE0D5;
+  border-radius: 8px;
+  padding: 20px;
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.stat-card h3 {
+  color: #7A7A7A;
+  font-size: 14px;
+  margin-bottom: 10px;
+  font-weight: 400;
+}
+
+.stat-card p {
+  color: #E86A33;
+  font-size: 28px;
+  font-weight: bold;
+}
+
+.bill-list {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.bill-item {
+  background: #fff;
+  border: 1px solid #EAE0D5;
+  border-radius: 6px;
+  margin-bottom: 10px;
+}
+
+.bill-header-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+  align-items: center;
+  padding: 12px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.bill-header-row:hover {
+  background: #F5EFE6;
+}
+
+.payment-badge {
+  background: #E86A33;
+  color: #fff;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  text-align: center;
+  justify-self: start;
+}
+
+.bill-details {
+  padding: 12px;
+  border-top: 1px solid #EAE0D5;
+  background: #FDFBF6;
+}
+
+.bill-details table {
+  width: 100%;
+  margin-bottom: 10px;
+}
+
+.bill-details td {
+  padding: 5px;
+}
+
+.no-data {
+  text-align: center;
+  color: #888;
+  padding: 20px;
+}
+
+/* Menu Management */
+.menu-management {
+  min-width: 600px;
+}
+
+.menu-tabs {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 10px;
+  background: #F5EFE6;
+  border: 1px solid #EAE0D5;
+  color: #3C2A21;
+  cursor: pointer;
+}
+
+.tab-btn.active {
+  background: #E86A33;
+  color: #fff;
+  border-color: #E86A33;
+}
+
+.section-box {
+  background: #fff;
+  border: 1px solid #EAE0D5;
+  border-radius: 8px;
+  padding: 15px;
+  margin-bottom: 15px;
+}
+
+.section-box h3 {
+  color: #3C2A21;
+  font-size: 14px;
+  margin-bottom: 12px;
+  font-weight: 600;
+}
+
+.input-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.input-row input,
+.input-row select {
+  flex: 1;
+  min-width: 120px;
+}
+
+.input-row button {
+  padding: 10px 20px;
+}
+
+.item-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.manage-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px;
+  background: #F5EFE6;
+  border-radius: 6px;
+}
+
+.manage-item span {
+  color: #3C2A21;
+}
+
+
+/* ================= DASHBOARD ADDITIONS ================= */
+
+/* 5th stat card — Out of Stock */
+.dash-card-outofstock { border-top: 3px solid #f44336; }
+.dash-card-outofstock .dash-card-value { color: #f44336; }
+
+/* ── Revenue chart toggle ───────────────────────────────── */
+.dash-panel-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.dash-chart-toggle {
+  display: flex;
+  gap: 4px;
+}
+
+.dash-toggle-btn {
+  padding: 5px 12px;
+  border-radius: 14px;
+  border: 1.5px solid #e0d5c5;
+  background: white;
+  color: #888;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.dash-toggle-btn:hover { border-color: #c17f24; color: #c17f24; }
+.dash-toggle-btn.active { background: #c17f24; border-color: #c17f24; color: white; }
+
+/* ── Export dropdown ────────────────────────────────────── */
+.dash-export-dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.dash-export-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  min-width: 200px;
+  background: white;
+  border: 1px solid #e0d5c5;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+  z-index: 200;
+  overflow: hidden;
+}
+
+.dash-export-menu button {
+  display: block;
+  width: 100%;
+  padding: 11px 16px;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  color: #3C2A21;
+  font-weight: 500;
+  transition: background 0.12s;
+}
+.dash-export-menu button:hover { background: #fdf5e8; }
+.dash-export-menu button + button { border-top: 1px solid #f0e8d8; }
+
+/* ── Category revenue panel ─────────────────────────────── */
+.dash-panel-category {
+  padding: 20px;
+}
+
+.dash-category-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+/* (reuses .dash-payment-dot, .dash-payment-mode, .dash-payment-bar-wrap,
+   .dash-payment-bar, .dash-payment-amount, .dash-payment-pct from existing CSS) */
+
+/* ── Inventory health panel ─────────────────────────────── */
+.dash-inventory-panel {
+  background: white;
+  border: 1px solid #f0e8d8;
+  border-top: none;
+  padding: 16px 20px 20px;
+}
+
+.dash-inventory-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.dash-inventory-panel-header .dash-panel-title {
+  margin: 0;
+}
+
+.dash-inv-open-btn {
+  padding: 6px 14px;
+  border: 1.5px solid #c17f24;
+  border-radius: 8px;
+  background: white;
+  color: #c17f24;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.dash-inv-open-btn:hover { background: #c17f24; color: white; }
+
+.dash-inventory-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.dash-inv-col-title {
+  margin: 0 0 10px 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: #555;
+}
+
+.dash-inv-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.dash-inv-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  background: #fdf9f3;
+  border-radius: 6px;
+  gap: 8px;
+}
+
+.dash-inv-name {
+  font-size: 13px;
+  color: #3C2A21;
+  font-weight: 500;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dash-inv-ok {
+  font-size: 13px;
+  color: #4CAF50;
+  padding: 8px 0;
+  font-weight: 600;
+}
+
+.dash-inv-placeholder {
+  font-size: 13px;
+  color: #bbb;
+  padding: 8px 0;
+}
+
+/* Stock badges */
+.dash-stock-badge {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 10px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.dash-stock-low  { background: #fff8e1; color: #E65100; }
+.dash-stock-out  { background: #fdecea; color: #c62828; font-size: 11px; }

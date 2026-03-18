@@ -1,0 +1,49 @@
+{
+  "items": [
+    {
+      "name": "Peri Peri Potato Twister",
+      "stock": 80,
+      "lowStock": 5
+    },
+    {
+      "name": "Freedom Fries",
+      "stock": 98,
+      "lowStock": 5
+    },
+    {
+      "name": "Veg Cheese Sandwich",
+      "stock": 40,
+      "lowStock": 5
+    },
+    {
+      "name": "Classic Pizza",
+      "stock": 30,
+      "lowStock": 3
+    },
+    {
+      "name": "potato twister",
+      "stock": 50,
+      "lowStock": 5
+    },
+    {
+      "name": "cotton",
+      "stock": 6,
+      "lowStock": 5
+    },
+    {
+      "name": "potato",
+      "stock": 50,
+      "lowStock": 5
+    },
+    {
+      "name": "corn pizza",
+      "stock": 50,
+      "lowStock": 5
+    },
+    {
+      "name": "pakoda",
+      "stock": 50,
+      "lowStock": 5
+    }
+  ]
+}

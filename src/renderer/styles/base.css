@@ -1,0 +1,21 @@
+/* ==============================
+   BLOOM CAFE POS - Modern Trattoria Theme
+   ============================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap');
+
+/* ==============================
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Nunito', 'Segoe UI', Arial, sans-serif;
+  background: #FDFBF6; /* Creamy white */
+  color: #3C2A21; /* Dark charcoal */
+  overflow-x: hidden;
+}
+
+/* ==============================

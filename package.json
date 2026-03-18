@@ -1,0 +1,109 @@
+{
+  "name": "bloom-cafe-pos",
+  "version": "1.1.0",
+  "description": "Premium Point of Sale system for Bloom Cafe",
+  "main": "src/main/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron-rebuild -f -w better-sqlite3 && electron .",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win",
+    "build:mac": "electron-builder --mac",
+    "dist": "electron-builder --publish=never",
+    "dist:win": "electron-builder --win --publish=never",
+    "dist:mac": "electron-builder --mac --publish=never",
+    "pack": "electron-builder --dir",
+    "rebuild-mac": "electron-rebuild -f -w better-sqlite3",
+    "postinstall": "electron-builder install-app-deps"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testMatch": [
+      "**/tests/**/*.test.js"
+    ],
+    "collectCoverageFrom": [
+      "src/main/**/*.js",
+      "!src/main/main.js"
+    ]
+  },
+  "keywords": [
+    "pos",
+    "cafe",
+    "restaurant",
+    "billing",
+    "inventory",
+    "sales",
+    "coffee",
+    "electron"
+  ],
+  "author": {
+    "name": "Ayush Kaushik",
+    "email": "coc123.1607@gmail.com",
+    "url": "https://github.com/ayushkaushik"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/ayushkaushik/bloom-cafe-pos",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ayushkaushik/bloom-cafe-pos.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ayushkaushik/bloom-cafe-pos/issues"
+  },
+  "devDependencies": {
+    "@electron/rebuild": "^4.0.3",
+    "electron": "^28.0.0",
+    "electron-builder": "^24.13.3",
+    "jest": "^29.0.0"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.10.0",
+    "electron-is-dev": "^2.0.0"
+  },
+  "build": {
+    "appId": "com.bloomcafe.pos",
+    "productName": "Bloom Cafe POS",
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/icons/icon-256.ico",
+      "executableName": "Bloom Cafe POS"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Bloom Cafe POS"
+    },
+    "files": [
+      "src/**/*",
+      "assets/**/*",
+      "config/**/*",
+      "data/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "**/node_modules/better-sqlite3/**"
+    ],
+    "extraResources": [
+      {
+        "from": "data",
+        "to": "data",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ]
+  }
+}

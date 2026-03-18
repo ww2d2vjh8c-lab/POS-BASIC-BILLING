@@ -1,0 +1,47 @@
+# ── Dependencies ─────────────────────────────────────────────────────────────
+node_modules/
+
+# ── Build output — never commit built artifacts ───────────────────────────────
+dist/
+out/
+*.exe
+*.dmg
+*.AppImage
+
+# ── macOS system files ────────────────────────────────────────────────────────
+.DS_Store
+**/.DS_Store
+
+# ── Runtime data (lives in userData, not the repo) ───────────────────────────
+*.db
+*.db-shm
+*.db-wal
+*.log
+logs/
+backups/
+
+# ── Temp / swap files ─────────────────────────────────────────────────────────
+*.tmp
+*.bak
+*.pid.tmp
+
+# ── Environment config ────────────────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+
+# ── Editor folders ────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ── Release package binaries (too large for git) ─────────────────────────────
+Release_Package/*.exe
+Release_Package/*.pdf
+
+# ── Coverage reports ─────────────────────────────────────────────────────────
+coverage/
+
+# ── Jest cache ────────────────────────────────────────────────────────────────
+.jest-cache/

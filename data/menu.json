@@ -1,0 +1,280 @@
+{
+  "categories": [
+    {
+      "name": "Hot Beverages",
+      "products": [
+        {
+          "name": "Chai",
+          "price": 20,
+          "halfPrice": null,
+          "hasVariants": false,
+          "addons": [
+            {
+              "name": "Extra Sugar",
+              "price": 0
+            },
+            {
+              "name": "makhan",
+              "price": 10
+            }
+          ],
+          "unavailable": false
+        },
+        {
+          "name": "Coffee",
+          "price": 30,
+          "halfPrice": null,
+          "hasVariants": false,
+          "addons": [
+            {
+              "name": "Extra Shot",
+              "price": 10
+            }
+          ]
+        },
+        {
+          "name": "Cappuccino",
+          "price": 60,
+          "halfPrice": null,
+          "hasVariants": false,
+          "addons": [
+            {
+              "name": "Oat Milk",
+              "price": 20
+            }
+          ]
+        },
+        {
+          "name": "Masala Chai",
+          "price": 25,
+          "halfPrice": null,
+          "hasVariants": false,
+          "addons": [
+            {
+              "name": "Extra Ginger",
+              "price": 5
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Cold Beverages",
+      "products": [
+        {
+          "name": "Cold Coffee",
+          "price": 80,
+          "halfPrice": null,
+          "hasVariants": false,
+          "addons": [
+            {
+              "name": "Ice Cream",
+              "price": 20
+            }
+          ]
+        },
+        {
+          "name": "Lemonade",
+          "price": 40,
+          "halfPrice": null,
+          "hasVariants": false,
+          "addons": [
+            {
+              "name": "Mint",
+              "price": 5
+            }
+          ]
+        },
+        {
+          "name": "Mango Shake",
+          "price": 70,
+          "halfPrice": null,
+          "hasVariants": false,
+          "addons": []
+        }
+      ]
+    },
+    {
+      "name": "Snacks",
+      "products": [
+        {
+          "name": "Samosa",
+          "price": 15,
+          "halfPrice": null,
+          "hasVariants": false,
+          "addons": [
+            {
+              "name": "Extra Chutney",
+              "price": 5
+            }
+          ]
+        },
+        {
+          "name": "Bread Pakoda",
+          "price": 30,
+          "halfPrice": null,
+          "hasVariants": false,
+          "addons": []
+        },
+        {
+          "name": "French Fries",
+          "price": 60,
+          "halfPrice": 40,
+          "hasVariants": true,
+          "addons": [
+            {
+              "name": "Cheese Dip",
+              "price": 15
+            },
+            {
+              "name": "Peri Peri",
+              "price": 5
+            }
+          ]
+        },
+        {
+          "name": "Veg Sandwich",
+          "price": 50,
+          "halfPrice": null,
+          "hasVariants": false,
+          "addons": [
+            {
+              "name": "Grilled",
+              "price": 10
+            }
+          ]
+        },
+        {
+          "name": "pakoda",
+          "price": 100,
+          "hasVariants": true,
+          "halfPrice": 50,
+          "unavailable": false,
+          "addons": []
+        }
+      ]
+    },
+    {
+      "name": "Main Course",
+      "products": [
+        {
+          "name": "Veg Biryani",
+          "price": 120,
+          "halfPrice": 70,
+          "hasVariants": true,
+          "addons": [
+            {
+              "name": "Raita",
+              "price": 20
+            },
+            {
+              "name": "Extra Gravy",
+              "price": 15
+            }
+          ]
+        },
+        {
+          "name": "Dal Rice",
+          "price": 80,
+          "halfPrice": 50,
+          "hasVariants": true,
+          "addons": [
+            {
+              "name": "Papad",
+              "price": 10
+            }
+          ]
+        },
+        {
+          "name": "Paneer Butter Masala",
+          "price": 150,
+          "halfPrice": 90,
+          "hasVariants": true,
+          "addons": [
+            {
+              "name": "Extra Roti",
+              "price": 15
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Breads",
+      "products": [
+        {
+          "name": "Roti",
+          "price": 10,
+          "halfPrice": null,
+          "hasVariants": false,
+          "addons": []
+        },
+        {
+          "name": "Naan",
+          "price": 20,
+          "halfPrice": null,
+          "hasVariants": false,
+          "addons": [
+            {
+              "name": "Butter",
+              "price": 5
+            }
+          ]
+        },
+        {
+          "name": "Paratha",
+          "price": 30,
+          "halfPrice": null,
+          "hasVariants": false,
+          "addons": [
+            {
+              "name": "Curd",
+              "price": 10
+            },
+            {
+              "name": "Butter",
+              "price": 5
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Desserts",
+      "products": [
+        {
+          "name": "Gulab Jamun",
+          "price": 40,
+          "halfPrice": null,
+          "hasVariants": false,
+          "addons": [
+            {
+              "name": "Ice Cream",
+              "price": 20
+            }
+          ]
+        },
+        {
+          "name": "Ice Cream",
+          "price": 50,
+          "halfPrice": null,
+          "hasVariants": false,
+          "addons": [
+            {
+              "name": "Extra Scoop",
+              "price": 20
+            }
+          ]
+        },
+        {
+          "name": "Kheer",
+          "price": 45,
+          "halfPrice": 30,
+          "hasVariants": true,
+          "addons": []
+        }
+      ]
+    }
+  ],
+  "addons": []
+}
