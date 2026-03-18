@@ -24,17 +24,22 @@
     margin: 0;
     font-family: 'Courier New', Courier, monospace;
     font-size: 10px;
+    font-weight: bold;
     line-height: 1.4;
+    letter-spacing: 0.01em;
     color: #000 !important;
     background: #fff !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
+    -webkit-font-smoothing: none;
+    text-rendering: optimizeSpeed;
   }
 
   .receipt-wrap {
     width: 56mm;
     max-width: 56mm;
     font-size: 10px;
+    font-weight: bold;
     word-break: break-word;
     overflow: hidden;
   }
