@@ -76,6 +76,21 @@ function migrateProductAddons(db, userData) {
 }
 
 /**
+ * Migration v4: Persist cash_received on bills.
+ * - Adds cash_received REAL column to bills (nullable — only set for Cash payments).
+ */
+function runMigrationV4(db) {
+  logger.info("MIGRATE_V4_START");
+  db.transaction(() => {
+    try {
+      db.exec("ALTER TABLE bills ADD COLUMN cash_received REAL");
+    } catch (_e) { /* column already exists — safe to ignore */ }
+    setMigrationVersion(4);
+    logger.info("MIGRATE_V4_COMPLETE");
+  })();
+}
+
+/**
  * Migration v3: Product-linked inventory.
  * - Adds product_id FK to inventory (nullable, ON DELETE SET NULL).
  * - Adds archived flag to inventory (soft-delete support).
@@ -243,6 +258,17 @@ function migrateFromJSON() {
       logger.error("MIGRATE_V3_FAILED", { error: error.message, stack: error.stack });
       // Non-critical: the app still functions without the new columns.
       // Will retry on next launch.
+    }
+  }
+
+  // v4 — persist cash_received on bills (idempotent: only runs when currentVersion < 4)
+  const versionAfterV3 = getMigrationVersion();
+  if (versionAfterV3 < 4) {
+    try {
+      runMigrationV4(db);
+    } catch (error) {
+      logger.error("MIGRATE_V4_FAILED", { error: error.message, stack: error.stack });
+      // Non-critical: app still functions; will retry on next launch.
     }
   }
 

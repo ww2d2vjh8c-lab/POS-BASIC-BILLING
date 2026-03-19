@@ -126,8 +126,10 @@ function renderBillContent(billData, { isPreview = false } = {}) {
     ]),
     divider(),
     "Payment: " + paymentMode.substring(0, 10).padStart(22),
-    "Received: " + formatPrice(billData?.cashReceived ?? finalTotal).padStart(21),
-    "Change: " + formatPrice(Math.max(0, (billData?.cashReceived ?? finalTotal) - finalTotal)).padStart(23),
+    ...(paymentMode === "Cash" ? [
+      "Received: " + formatPrice(billData?.cashReceived ?? finalTotal).padStart(21),
+      "Change:   " + formatPrice(Math.max(0, (billData?.cashReceived ?? finalTotal) - finalTotal)).padStart(21),
+    ] : []),
     divider(),
     centerText("Thank You!"),
     centerText("Visit Again"),
@@ -348,10 +350,32 @@ async function finalizeBill() {
     // Remember this payment mode for next bill
     try { localStorage.setItem("lastPaymentMode", paymentMode); } catch (_) {}
 
-    const result = await window.electronAPI.finalizeBill( {
+    // Read cash received input (only relevant for Cash)
+    const cashInputEl = document.getElementById("cashReceivedInput");
+    const cashEnteredStr = cashInputEl ? cashInputEl.value.trim() : "";
+    const cashReceived = cashEnteredStr !== "" ? parseFloat(cashEnteredStr) : null;
+
+    // Short-payment guard: block finalization when entered cash < total
+    if (paymentMode === "Cash" && cashReceived !== null && !isNaN(cashReceived)) {
+      const discountedTotal = Math.max(0, _activeBillTotal - (_discountAmount || 0));
+      if (cashReceived < discountedTotal) {
+        showToast(
+          `Cash ₹${cashReceived.toFixed(2)} is less than total ₹${discountedTotal.toFixed(2)}`,
+          "error"
+        );
+        if (finalizeBtn) finalizeBtn.disabled = false;
+        isFinalizingBill = false;
+        return;
+      }
+    }
+
+    const result = await window.electronAPI.finalizeBill({
       orderId:        currentOrderId,
       paymentMode:    paymentMode,
       discountAmount: _discountAmount || 0,
+      cashReceived:   (paymentMode === "Cash" && cashReceived !== null && !isNaN(cashReceived))
+                        ? cashReceived
+                        : null,
     });
     
     if (!result || !result.success) {
@@ -362,12 +386,6 @@ async function finalizeBill() {
     
     const finalBill = result.data;
     if (finalBill && finalBill.billNo) {
-      // Attach cash received for receipt rendering
-      const cashInput = document.getElementById("cashReceivedInput");
-      const cashReceived = cashInput && cashInput.value ? parseFloat(cashInput.value) : null;
-      if (cashReceived !== null && !isNaN(cashReceived) && paymentMode === "Cash") {
-        finalBill.cashReceived = cashReceived;
-      }
       renderBillContent(finalBill);
       showToast(`Bill #${finalBill.billNo} finalized successfully!`);
 

@@ -1,6 +1,6 @@
 {
   "name": "bloom-cafe-pos",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Premium Point of Sale system for Bloom Cafe",
   "main": "src/main/main.js",
   "scripts": {

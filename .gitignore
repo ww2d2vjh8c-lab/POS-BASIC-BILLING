@@ -30,11 +30,13 @@ backups/
 .env.local
 .env.*.local
 
-# ── Editor folders ────────────────────────────────────────────────────────────
+# ── Editor / tool folders ─────────────────────────────────────────────────────
 .vscode/
 .idea/
 *.swp
 *.swo
+.qodo/
+**/.qodo/
 
 # ── Release package binaries (too large for git) ─────────────────────────────
 Release_Package/*.exe

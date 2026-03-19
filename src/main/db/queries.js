@@ -463,7 +463,7 @@ function removeSession(orderId) {
 function readSalesData(date) {
   const db = getDB();
   const bills = db.prepare(`
-    SELECT id, bill_no, order_id, items, total, payment_mode, bill_date, time, print_status, created_at
+    SELECT id, bill_no, order_id, items, total, payment_mode, bill_date, time, print_status, created_at, cash_received
     FROM bills WHERE bill_date = ? ORDER BY id ASC
   `).all(date);
 
@@ -478,7 +478,8 @@ function readSalesData(date) {
     billDate: b.bill_date,
     time: b.time || b.created_at,
     printStatus: b.print_status,
-    createdAt: b.created_at
+    createdAt: b.created_at,
+    cashReceived: b.cash_received != null ? b.cash_received : null,
   }));
 
   return {
@@ -544,9 +545,12 @@ function finalizeOrder(bill, items, shouldDeductInventory) {
     const freshBillNo = generateBillNo(billDate);
 
     // Step 3 — Insert bill:
+    const cashReceivedVal = (bill.paymentMode === "Cash" && bill.cashReceived != null)
+      ? bill.cashReceived
+      : null;
     db.prepare(`
-      INSERT INTO bills (bill_no, order_id, items, total, payment_mode, bill_date, time)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO bills (bill_no, order_id, items, total, payment_mode, bill_date, time, cash_received)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       freshBillNo,
       bill.orderId || bill.order_id || "",
@@ -554,7 +558,8 @@ function finalizeOrder(bill, items, shouldDeductInventory) {
       bill.total || 0,
       bill.paymentMode || bill.payment_mode || "Cash",
       billDate,
-      bill.time || new Date().toISOString()
+      bill.time || new Date().toISOString(),
+      cashReceivedVal
     );
 
     // Step 4 — Return freshBillNo from transaction

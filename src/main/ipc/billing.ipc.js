@@ -22,7 +22,7 @@ function register(ipcMain) {
     try {
       validateBillPayload(payload);
       logger.info('BILL_FINALIZE_START', { orderId: payload?.orderId });
-      const { orderId, paymentMode } = payload;
+      const { orderId, paymentMode, cashReceived } = payload;
 
       if (finalizingOrders.has(orderId)) {
         return { success: false, error: 'Bill is already being processed, please wait' };
@@ -48,6 +48,9 @@ function register(ipcMain) {
           paymentMode:    paymentMode || 'Cash',
           billDate:       today,
           time:           new Date().toISOString(),
+          cashReceived:   ((paymentMode || 'Cash') === 'Cash' && typeof cashReceived === 'number')
+                            ? cashReceived
+                            : null,
         };
 
         const shouldDeduct = settings.inventoryEnabled && Array.isArray(session.items) && session.items.length > 0;

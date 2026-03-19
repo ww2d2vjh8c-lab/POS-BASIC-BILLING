@@ -1,6 +1,28 @@
-# BLOOM CAFE POS - Release Notes
+# Bloom Cafe POS — Changelog
 
-## Version 1.1.0 (March 15, 2026)
+All notable changes to this project are documented here.
+Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
+
+---
+
+## [1.2.0] — March 19, 2026
+
+### Fixed
+- **Cash received on UPI/Card receipts** — "Received" and "Change" lines now only appear on Cash receipts; UPI and Card receipts are clean
+- **Cash received not saved to DB** — `cash_received` is now persisted in the bills table; reprints from the Dashboard show the correct amount
+- **Short-payment allowed** — Finalization is now blocked when entered cash is less than the bill total, with a clear error toast
+
+### Added
+- **Migration v4** — Adds `cash_received REAL` column to bills table (runs automatically on next launch, fully idempotent)
+- **System pipeline diagram** — Interactive visual in `docs/pipeline-visual.html` showing all 4 system pipelines: order flow, tech architecture, inventory deduction, and migration history
+
+### Improved
+- `readSalesData()` now returns `cashReceived` from the DB for correct dashboard reprint behavior
+- `finalizeBill()` in the renderer reads cash input once and passes it through IPC to the DB in a single clean flow
+
+---
+
+## [1.1.0] — March 15, 2026
 
 ### ✅ Production Ready Features
 
