@@ -372,3 +372,129 @@ coc123.1607@gmail.com
 *Point of Sale system delivered to Bloom Cafe, 2026*
 
 </div>
+
+
+---
+
+## 🔍 Inspect & Debug Locally
+
+This section covers how to run, inspect, and test Bloom Cafe POS on your Windows machine (or cross-platform in dev mode).
+
+### 1. Clone & Run in Dev Mode
+
+```bash
+git clone https://github.com/ww2d2vjh8c-lab/POS-BASIC-BILLING
+cd POS-BASIC-BILLING
+npm install
+npm start          # Electron window opens automatically
+```
+
+> **Note:** The app is built for Windows. Dev mode works on any OS, but thermal printer integration and the NSIS installer require Windows.
+
+### 2. Build the Windows Installer Locally
+
+```bash
+npm run build:win
+# → dist/Bloom Cafe POS Setup 1.2.0.exe
+```
+
+Requires Windows or the GitHub Actions CI workflow (which builds on `windows-latest` automatically on every push to `main`).
+
+### 3. Open Electron DevTools
+
+While the app is running, press **`Ctrl + Shift + I`** (or `F12`) inside the Electron window.
+
+This opens Chromium DevTools attached to the renderer process. From here:
+
+- **Console** — see `window.electronAPI.*` calls, IPC bridge events, and any renderer-side errors
+- **Sources** — browse and set breakpoints in `src/renderer/js/*.js` files
+- **Elements** — inspect the live DOM, CSS, and layout of every screen
+- **Network** — not applicable (fully offline), but useful if you add any external calls
+
+To enable DevTools programmatically (in case keyboard shortcut doesn't work), add this to `src/main/main.js`:
+
+```js
+mainWindow.webContents.openDevTools();
+```
+
+### 4. Debug the Main Process (Node.js)
+
+The main process runs in Node.js and handles all IPC, DB, and printer logic. To debug it:
+
+```bash
+npm start -- --inspect
+```
+
+Then open **`chrome://inspect`** in Chrome → click *inspect* under Remote Target. Set breakpoints in `src/main/ipc/*.ipc.js`, `src/main/db/queries.js`, or any service file.
+
+### 5. Inspect the SQLite Database Directly
+
+The live database sits at:
+
+```
+Windows: %APPDATA%\Bloom Cafe POS\bloom-cafe.db
+Dev mode: same path (the app always writes to AppData)
+```
+
+Use **[DB Browser for SQLite](https://sqlitebrowser.org/)** (free) to inspect it:
+
+1. Download and install DB Browser for SQLite
+2. Open `bloom-cafe.db`
+3. Browse the **Browse Data** tab — key tables:
+
+| Table | What it contains |
+|-------|----------------|
+| `bills` | Every finalized bill with payment method, cash received, totals |
+| `orders` | Active table sessions |
+| `inventory` | Stock levels, product links, restock history |
+| `products` | Menu items, add-ons, pricing |
+| `audit_log` | Full trail of every action (actor, action, target, timestamp) |
+
+4. Use the **Execute SQL** tab to run queries, e.g.:
+
+```sql
+SELECT * FROM bills ORDER BY created_at DESC LIMIT 10;
+SELECT * FROM audit_log WHERE action = 'finalize_bill';
+SELECT p.name, i.quantity FROM inventory i JOIN products p ON i.product_id = p.id;
+```
+
+> **Tip:** The DB runs in WAL mode. In DB Browser, click **Write Changes** after the app writes to see the latest data without reopening the file.
+
+### 6. Test the Full Order → Bill → Print Flow
+
+1. Run `npm start` and select a table
+2. Add menu items to the cart (test add-ons, Half/Full variants, and discounts)
+3. Open Bill Preview → choose Cash, UPI, or Card
+4. For Cash: enter received amount — the change calculator should block short payments
+5. Click **Finalize Bill** — the atomic DB transaction runs: inventory deducted, bill number generated, audit log written
+6. Check the **Dashboard** (left nav) — the new bill appears immediately with correct totals
+7. In DB Browser: `SELECT * FROM bills ORDER BY created_at DESC LIMIT 1` — inspect every field
+
+### 7. Test Thermal Printing Without a Printer
+
+In **Settings → Printer**, select any available printer or use **Microsoft Print to PDF** (built into Windows) to print receipts to a PDF file instead of physical paper.
+
+This lets you verify the 58mm receipt layout, item formatting, and cash/change display without any hardware.
+
+### 8. View App Logs
+
+Structured logs are written to:
+
+```
+Windows: %APPDATA%\Bloom Cafe POS\logs\
+```
+
+Tail the log file in PowerShell to watch events in real time:
+
+```powershell
+Get-Content "$env:APPDATA\Bloom Cafe POS\logs\app.log" -Wait -Tail 50
+```
+
+### 9. Run Tests
+
+```bash
+npm test                   # Jest — all unit tests
+npm run test:coverage      # With coverage report
+```
+
+Current test coverage targets: `validator.js`, `analytics.service.js`, `file.service.js`
