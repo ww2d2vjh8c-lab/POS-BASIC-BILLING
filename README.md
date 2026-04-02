@@ -20,6 +20,7 @@
   <img src="https://img.shields.io/badge/better--sqlite3-native-FF6B35?style=flat-square" />
   <img src="https://img.shields.io/badge/Jest-tested-C21325?style=flat-square&logo=jest" />
   <img src="https://img.shields.io/badge/CI-GitHub%20Actions-2088FF?style=flat-square&logo=githubactions&logoColor=white" />
+  <img src="https://github.com/ww2d2vjh8c-lab/POS-BASIC-BILLING/actions/workflows/build-windows.yml/badge.svg" alt="Build Status" />
   <img src="https://img.shields.io/badge/printer-58mm%20thermal-8B5CF6?style=flat-square" />
 </p>
 
@@ -154,7 +155,7 @@ Built on **Electron + SQLite** — proven desktop-grade tech used by companies l
 ## 🗂️ Project Structure
 
 ```
-bloom-cafe-pos/
+POS-BASIC-BILLING/
 │
 ├── src/
 │   ├── main/                        # ⚙️  Electron main process (Node.js)
@@ -194,7 +195,8 @@ bloom-cafe-pos/
 │       │   ├── inventory.js         # Stock management UI
 │       │   ├── menu-manager.js      # Menu edit UI
 │       │   ├── store.js             # Shared state
-│       │   └── utils.js             # Helpers, toast, modals
+│       │   ├── utils.js             # Helpers, toast, modals
+│       │   └── printer-settings.js     # Printer selection UI
 │       └── styles/
 │           ├── base.css             # Reset, variables, typography
 │           ├── layout.css           # App shell, sidebar, panels
@@ -247,8 +249,8 @@ bloom-cafe-pos/
 
 ```bash
 # 1. Clone the repo
-git clone https://github.com/ww2d2vjh8c-lab/bloom-cafe-pos.git
-cd bloom-cafe-pos
+git clone https://github.com/ww2d2vjh8c-lab/POS-BASIC-BILLING.git
+cd POS-BASIC-BILLING
 
 # 2. Install dependencies
 npm install
@@ -341,7 +343,7 @@ Release_Package/
 ├── INSTALLATION_GUIDE.pdf       ← Step-by-step for non-technical users
 ├── APP_FEATURES.md              ← Complete feature reference
 ├── LICENSE.txt                  ← MIT license
-└── assets/                      ← Screenshots (coming soon)
+└── assets/                      ← App screenshots
 ```
 
 > The `.exe` and `.pdf` files are excluded from git (see `.gitignore`). They are built separately and handed to the client.
@@ -356,7 +358,7 @@ See [CHANGELOG.md](./CHANGELOG.md) for full version history.
 
 ## 📄 License
 
-**MIT © 2025 Ayush Kaushik**
+**MIT © 2026 Ayush Kaushik**
 
 > The client (Bloom Cafe / Sarthak Adwani) holds a perpetual license to use and operate this software.
 

@@ -45,13 +45,13 @@
     "url": "https://github.com/ayushkaushik"
   },
   "license": "MIT",
-  "homepage": "https://github.com/ayushkaushik/bloom-cafe-pos",
+  "homepage": "https://github.com/ww2d2vjh8c-lab/POS-BASIC-BILLING",
   "repository": {
     "type": "git",
-    "url": "https://github.com/ayushkaushik/bloom-cafe-pos.git"
+    "url": "https://github.com/ww2d2vjh8c-lab/POS-BASIC-BILLING.git"
   },
   "bugs": {
-    "url": "https://github.com/ayushkaushik/bloom-cafe-pos/issues"
+    "url": "https://github.com/ww2d2vjh8c-lab/POS-BASIC-BILLING/issues"
   },
   "devDependencies": {
     "@electron/rebuild": "^4.0.3",
