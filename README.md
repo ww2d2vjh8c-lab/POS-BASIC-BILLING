@@ -1,502 +1,211 @@
-<div align="center">
-
-```
-╔══════════════════════════════════════════════════════╗
-║          ☕  BLOOM CAFE POS  ☕                       ║
-║   Fast · Offline · Built for real café life           ║
-╚══════════════════════════════════════════════════════╝
-```
-
-<p>
-  <img src="https://img.shields.io/badge/version-1.2.0-brown?style=for-the-badge" />
-  <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-0078D4?style=for-the-badge&logo=windows&logoColor=white" />
-  <img src="https://img.shields.io/badge/Electron-28-47848F?style=for-the-badge&logo=electron&logoColor=white" />
-  <img src="https://img.shields.io/badge/SQLite-WAL%20Mode-003B57?style=for-the-badge&logo=sqlite&logoColor=white" />
-  <img src="https://img.shields.io/badge/license-MIT-22c55e?style=for-the-badge" />
+<p align="center">
+  <img src="https://img.shields.io/badge/Electron-28-47848F?style=for-the-badge&logo=electron" />
+  <img src="https://img.shields.io/badge/SQLite-WAL_Mode-003B57?style=for-the-badge&logo=sqlite" />
+  <img src="https://img.shields.io/badge/Node.js-20-339933?style=for-the-badge&logo=node.js" />
+  <img src="https://img.shields.io/badge/Platform-Windows-0078D4?style=for-the-badge&logo=windows" />
+  <img src="https://img.shields.io/badge/CI/CD-GitHub_Actions-2088FF?style=for-the-badge&logo=github-actions" />
+  <img src="https://img.shields.io/badge/Status-Production-brightgreen?style=for-the-badge" />
 </p>
 
-<p>
-  <img src="https://img.shields.io/badge/Node.js-18+-339933?style=flat-square&logo=nodedotjs&logoColor=white" />
-  <img src="https://img.shields.io/badge/better--sqlite3-native-FF6B35?style=flat-square" />
-  <img src="https://img.shields.io/badge/Jest-tested-C21325?style=flat-square&logo=jest" />
-  <img src="https://img.shields.io/badge/CI-GitHub%20Actions-2088FF?style=flat-square&logo=githubactions&logoColor=white" />
-  <img src="https://github.com/ww2d2vjh8c-lab/POS-BASIC-BILLING/actions/workflows/build-windows.yml/badge.svg" alt="Build Status" />
-  <img src="https://img.shields.io/badge/printer-58mm%20thermal-8B5CF6?style=flat-square" />
-</p>
-
-**A professional, fully offline Point of Sale system — built for Bloom Cafe.**
-Zero cloud. Zero subscriptions. Every rupee of data lives on your machine.
-
-*Developed by [Ayush Kaushik](mailto:coc123.1607@gmail.com) · Delivered to Bloom Cafe, Sarthak Adwani*
-
-</div>
+<h1 align="center">Bloom Cafe POS</h1>
+<p align="center"><strong>Production-grade offline-first point-of-sale system — running daily in a real café</strong></p>
 
 ---
 
-## 📌 Table of Contents
+## About
 
-- [What this is](#-what-this-is)
-- [Features](#-features)
-- [System Pipeline](#-system-pipeline)
-- [Tech Stack](#-tech-stack)
-- [Project Structure](#-project-structure)
-- [Getting Started](#-getting-started)
-- [Database Migrations](#-database-migrations)
-- [Testing](#-testing)
-- [CI / CD](#-ci--cd)
-- [Release Package](#-release-package)
-- [Changelog](#-changelog)
-- [License](#-license)
+Bloom Cafe POS is a desktop point-of-sale application built for and delivered to a real café client. It runs offline-first on Windows, handles the full billing workflow for a multi-table café, and has been in daily production use since delivery.
+
+This is not a demo or toy project — it processes real orders at a real business.
 
 ---
 
-## 💡 What this is
+## Features
 
-Bloom Cafe POS is a **desktop billing and café management system** that runs entirely on Windows — no internet, no monthly fees, no data going anywhere.
+### Table Management
+- 6 simultaneous table sessions
+- Visual table status — open, occupied, billed
+- Transfer items between tables
 
-It handles everything from the moment a customer sits down to the moment the receipt prints:
+### Order Management
+- Add items with **add-ons** (extra cheese, extra shot, etc.)
+- **Half / Full variants** per item — different prices per variant
+- Item quantity adjustment and removal
+- Per-order **discounts** (flat or percentage)
+- Running total updates in real time
 
-- Take orders at up to 6 tables simultaneously
-- Supports item add-ons, half/full variants, and discounts
-- Finalizes bills with Cash, UPI, or Card
-- Prints to 58mm thermal printers automatically
-- Tracks inventory, deducting stock on every sale
-- Shows daily revenue, 7-day trends, and payment breakdowns on the dashboard
+### Billing
+- Generate itemized bill for any table
+- **Thermal receipt printing** — formatted for standard 80mm receipt printers
+- Bill history — view past transactions
 
-Built on **Electron + SQLite** — proven desktop-grade tech used by companies like Slack and VS Code.
+### Reliability
+- **Offline-first** — zero internet required after install
+- SQLite with **WAL mode** — atomic transactions, zero data loss on power failure
+- Auto-recovery on unexpected shutdown
 
----
-
-## ✨ Features
-
-| Module | Capability |
-|---|---|
-| 🪑 **Tables** | Visual 6-table layout, simultaneous sessions, live status indicators |
-| 🛒 **Orders** | Add items, add-ons, Half/Full variants; edit cart before billing |
-| 💰 **Billing** | Auto-numbered bills (`BC-YYYYMMDD-N`), Cash / UPI / Card payment modes |
-| 💵 **Cash Handling** | Enter received amount → live change calculation → blocks short payment |
-| 🖨️ **Thermal Print** | Optimized for EC-58 58mm, bold dark print, 32-char monospace layout |
-| 📊 **Dashboard** | Date navigation, vs-yesterday deltas, 7-day bar chart, top items, CSV export |
-| 📦 **Inventory** | Product-linked stock, auto-deduct on checkout, low-stock alerts, bulk restock |
-| 🍽️ **Menu Manager** | Categories, products, pricing, add-ons, availability toggles |
-| 🔖 **Discounts** | None / 10% / 20% / Custom — applied before finalization |
-| ⚙️ **Settings** | Table count, inventory on/off, printer selection, auto-print toggle |
-| 🔁 **Reprint** | Reprint any past bill from the dashboard with correct cash amounts |
-| 📋 **Audit Log** | Full trail of every bill, edit, and inventory change |
+### Installer & Updates
+- **One-click Windows installer** built via GitHub Actions CI (NSIS)
+- Schema migration system — database upgrades without data loss
 
 ---
 
-## 🔁 System Pipeline
+## Tech Stack
 
-> A full visual breakdown of how data flows through every layer of the system.
+| Component | Technology |
+|-----------|-----------|
+| Desktop shell | Electron 28 |
+| Backend logic | Node.js |
+| Database | SQLite (WAL mode) |
+| UI | HTML/CSS/JavaScript |
+| Installer | NSIS via GitHub Actions |
+| Testing | Jest |
 
-**[→ View Interactive Pipeline Diagram](./docs/pipeline-visual.html)**
+---
+
+## Architecture
 
 ```
-  ORDER FLOW
-  ──────────
-  Table Selected
-      │
-      ▼
-  Add Items to Cart ──────────────────┐
-      │                               │
-      ▼                               ▼
-  Save Session (orders table)    Edit / Remove items
-      │
-      ▼
-  Open Bill Preview
-      │
-      ├─── Cash ──→ Enter Amount → Validate ≥ Total
-      ├─── UPI  ──→ (no cash field)
-      └─── Card ──→ (no cash field)
-      │
-      ▼
-  ⚡ Atomic DB Transaction
-      ├── Deduct inventory (per item sold)
-      ├── Generate bill number (BC-YYYYMMDD-N)
-      ├── INSERT into bills (with cash_received)
-      ├── Write audit log
-      └── Mark order complete
-      │
-      ▼
-  Receipt Rendered → Print / Skip
-
-  ARCHITECTURE
-  ────────────
-  Renderer (HTML/JS/CSS)
-      │  window.electronAPI.*
-      ▼
-  Preload (contextBridge)
-      │  ipcRenderer.invoke
-      ▼
-  Main Process (IPC handlers)
-      │  better-sqlite3
-      ▼
-  SQLite Database (WAL mode)
+┌─────────────────────────────────────┐
+│           Electron Main Process      │
+│  ┌─────────────────────────────────┐│
+│  │   IPC Handlers (ipcMain)        ││
+│  │   - orders: create, update, bill││
+│  │   - tables: open, close, status ││
+│  │   - print: receipt              ││
+│  └──────────────┬──────────────────┘│
+│                 │                    │
+│  ┌──────────────▼──────────────────┐│
+│  │   SQLite Database (WAL mode)    ││
+│  │   - tables                      ││
+│  │   - orders + order_items        ││
+│  │   - menu_items                  ││
+│  │   - transactions                ││
+│  └─────────────────────────────────┘│
+└────────────────┬────────────────────┘
+                 │ contextBridge
+┌────────────────▼────────────────────┐
+│         Renderer Process (UI)        │
+│   Table grid → Order form → Bill     │
+└─────────────────────────────────────┘
 ```
 
 ---
 
-## 🏗️ Tech Stack
+## Database Schema
 
-| Layer | Choice | Why |
-|---|---|---|
-| **Desktop shell** | Electron 28 | Native OS integration, window management, printer access |
-| **Database** | better-sqlite3 (SQLite) | Synchronous, zero-config, 100% offline, WAL mode for durability |
-| **IPC** | contextBridge + ipcRenderer | Strict security isolation between renderer and main |
-| **Frontend** | Vanilla JS + CSS | Zero runtime dependencies, instant load, full control |
-| **Build** | electron-builder → NSIS | One-click Windows installer with shortcuts |
-| **CI/CD** | GitHub Actions (windows-latest) | Automated Windows builds on every push to main |
-| **Testing** | Jest | Unit + integration coverage |
-| **Logging** | Custom structured logger | Persistent log files with rotation |
+```sql
+-- Core tables
+CREATE TABLE menu_items (
+  id INTEGER PRIMARY KEY,
+  name TEXT NOT NULL,
+  category TEXT,
+  price_full REAL NOT NULL,
+  price_half REAL,
+  available INTEGER DEFAULT 1
+);
 
----
+CREATE TABLE orders (
+  id INTEGER PRIMARY KEY,
+  table_number INTEGER NOT NULL,
+  status TEXT DEFAULT 'open',  -- open | billed | closed
+  discount REAL DEFAULT 0,
+  created_at TEXT DEFAULT (datetime('now'))
+);
 
-## 🗂️ Project Structure
+CREATE TABLE order_items (
+  id INTEGER PRIMARY KEY,
+  order_id INTEGER REFERENCES orders(id),
+  menu_item_id INTEGER REFERENCES menu_items(id),
+  variant TEXT DEFAULT 'full',  -- full | half
+  quantity INTEGER DEFAULT 1,
+  addons TEXT,                  -- JSON array of selected add-ons
+  unit_price REAL NOT NULL
+);
 
-```
-POS-BASIC-BILLING/
-│
-├── src/
-│   ├── main/                        # ⚙️  Electron main process (Node.js)
-│   │   ├── db/
-│   │   │   ├── database.js          # DB init, schema creation, WAL setup
-│   │   │   ├── migrate.js           # Migration runner (v1 → v4)
-│   │   │   ├── queries.js           # All SQL queries — single source of truth
-│   │   │   └── seed-data.js         # Default menu for fresh installs
-│   │   ├── ipc/
-│   │   │   ├── billing.ipc.js       # finalize-bill, delete-bill, mark-printed
-│   │   │   ├── inventory.ipc.js     # stock CRUD, sync, bulk restock
-│   │   │   ├── menu.ipc.js          # categories, products, add-ons
-│   │   │   ├── orders.ipc.js        # active session management
-│   │   │   ├── dashboard.ipc.js     # sales data, weekly chart
-│   │   │   ├── printer.ipc.js       # webContents.print() wrapper
-│   │   │   ├── settings.ipc.js      # read/write app settings
-│   │   │   └── system.ipc.js        # integrity checks, health
-│   │   ├── services/
-│   │   │   ├── session.service.js   # In-memory order state
-│   │   │   ├── analytics.service.js # Revenue aggregation helpers
-│   │   │   ├── backup.service.js    # DB backup utility
-│   │   │   ├── file.service.js      # Date helpers, path utils
-│   │   │   └── health.service.js    # DB integrity verification
-│   │   ├── logger.js                # Structured event logger
-│   │   ├── validator.js             # Payload validation
-│   │   ├── preload.js               # contextBridge API surface
-│   │   └── main.js                  # App entry point
-│   │
-│   └── renderer/                    # 🖥️  Frontend (HTML + vanilla JS + CSS)
-│       ├── index.html               # Single-page app shell
-│       ├── js/
-│       │   ├── app.js               # Boot, routing, settings loader
-│       │   ├── order.js             # Table UI, menu rendering
-│       │   ├── cart.js              # Cart state management
-│       │   ├── bill.js              # Receipt render, finalization, print
-│       │   ├── dashboard.js         # Stats cards, charts, bills list
-│       │   ├── inventory.js         # Stock management UI
-│       │   ├── menu-manager.js      # Menu edit UI
-│       │   ├── store.js             # Shared state
-│       │   ├── utils.js             # Helpers, toast, modals
-│       │   └── printer-settings.js     # Printer selection UI
-│       └── styles/
-│           ├── base.css             # Reset, variables, typography
-│           ├── layout.css           # App shell, sidebar, panels
-│           ├── components.css       # Buttons, modals, cards
-│           ├── dashboard.css        # Dashboard-specific styles
-│           ├── inventory.css        # Inventory-specific styles
-│           ├── utilities.css        # Helper classes
-│           └── print.css            # @media print — thermal receipt
-│
-├── tests/
-│   ├── unit/
-│   │   ├── validator.test.js        # Input validation tests
-│   │   ├── analytics.service.test.js
-│   │   └── file.service.test.js
-│   └── integration/                 # (in progress)
-│
-├── docs/
-│   ├── pipeline-visual.html         # 🔁 Interactive system pipeline diagram
-│   ├── BUSINESS_LOGIC_ANALYSIS.md
-│   ├── WINDOWS_INSTALLER_BUILD.md
-│   └── WINDOWS_THERMAL_PRINTER_FIX.md
-│
-├── config/
-│   └── app.config.js                # Tunable constants
-│
-├── assets/
-│   └── icons/                       # App icons (PNG + ICO)
-│
-├── Release_Package/                 # 📦 Client delivery bundle
-│   ├── Bloom_Cafe_POS_Setup.exe     # Windows installer
-│   ├── USER_MANUAL.pdf              # 10-chapter end-user guide
-│   ├── INSTALLATION_GUIDE.pdf       # Step-by-step setup guide
-│   ├── APP_FEATURES.md
-│   └── LICENSE.txt
-│
-├── .github/
-│   └── workflows/
-│       └── build-windows.yml        # CI: auto-build Windows installer
-│
-├── CHANGELOG.md
-├── package.json
-└── .gitignore
+CREATE TABLE transactions (
+  id INTEGER PRIMARY KEY,
+  order_id INTEGER REFERENCES orders(id),
+  total REAL NOT NULL,
+  discount REAL DEFAULT 0,
+  paid_at TEXT DEFAULT (datetime('now'))
+);
 ```
 
 ---
 
-## 🚀 Getting Started
+## Local Setup (Development)
 
-### For development
+### Prerequisites
+- Node.js 18+
+- Windows (for full printer support) or macOS/Linux (for development)
+
+### Install and run
 
 ```bash
-# 1. Clone the repo
 git clone https://github.com/ww2d2vjh8c-lab/POS-BASIC-BILLING.git
 cd POS-BASIC-BILLING
-
-# 2. Install dependencies
 npm install
-
-# 3. Start in development mode
 npm start
 ```
 
-### Build Windows installer locally
+### Run tests
 
 ```bash
-npm run build:win
-# → dist/Bloom Cafe POS Setup 1.2.0.exe
+npm test
 ```
 
-> **Note:** The Windows build requires running on a Windows machine or using the GitHub Actions CI workflow below.
-
-### System requirements
-
-| | Minimum |
-|---|---|
-| OS | Windows 10 (64-bit) |
-| RAM | 2 GB |
-| Storage | 200 MB |
-| Printer | Any thermal (58mm recommended) or standard printer |
-
----
-
-## 🗃️ Database Migrations
-
-The app uses a version-tracked migration system. Migrations run automatically on startup — they are **idempotent** (safe to run multiple times).
-
-| Version | Name | What it does |
-|---|---|---|
-| v0 | Fresh install | Base schema created, seed menu inserted |
-| v1 | JSON → SQLite | Migrates legacy `menu.json` and `inventory.json` into DB |
-| v2 | Schema cleanup | Drops zombie tables, adds `time`, `idempotency_key`, `print_status` to bills |
-| v3 | Product-linked inventory | Adds `product_id` FK + `archived` flag to inventory, enables soft-delete |
-| v4 | Cash received | Adds `cash_received` column to bills — reprints now show correct cash amounts |
-
-**DB location at runtime:**
-```
-Windows: %APPDATA%\Bloom Cafe POS\bloom-cafe.db
-```
-
----
-
-## 🧪 Testing
+### Build Windows installer
 
 ```bash
-npm test                   # run all tests
-npm run test:coverage      # with coverage report
+npm run build
+# Output: dist/BloomCafePOS-Setup.exe
 ```
 
-Current coverage targets: `validator.js`, `analytics.service.js`, `file.service.js`
+Or let GitHub Actions build it automatically — every push to `main` produces a release artifact.
 
 ---
 
-## ⚙️ CI / CD
-
-Every push to `main` triggers an automated Windows build via **GitHub Actions**:
+## CI/CD Pipeline
 
 ```
 Push to main
-    │
-    ▼
-windows-latest runner
-    │
-    ├── npm ci
-    ├── npm run electron-rebuild
-    └── npm run build:win
-            │
-            ▼
-    Artifact: Bloom Cafe POS Setup *.exe
-    (downloadable from Actions tab)
+     │
+     ▼
+GitHub Actions
+  ├── npm test (Jest suite)
+  ├── npm run build (Electron + NSIS)
+  └── Upload installer artifact
 ```
 
-See [`.github/workflows/build-windows.yml`](./.github/workflows/build-windows.yml)
+The `.exe` installer is available as a GitHub Actions artifact on every successful build.
 
 ---
 
-## 📦 Release Package
+## Deployment (Client Delivery)
 
-The `Release_Package/` directory is the full client delivery bundle:
-
-```
-Release_Package/
-├── Bloom_Cafe_POS_Setup.exe     ← Windows NSIS installer
-├── USER_MANUAL.pdf              ← 10-chapter end-user guide
-├── INSTALLATION_GUIDE.pdf       ← Step-by-step for non-technical users
-├── APP_FEATURES.md              ← Complete feature reference
-├── LICENSE.txt                  ← MIT license
-└── assets/                      ← App screenshots
-```
-
-> The `.exe` and `.pdf` files are excluded from git (see `.gitignore`). They are built separately and handed to the client.
+1. Download `BloomCafePOS-Setup.exe` from GitHub Actions artifacts
+2. Run installer on client's Windows machine — one-click, no dependencies
+3. App auto-creates the SQLite database on first launch
+4. Configure menu items through the admin panel
 
 ---
 
-## 📋 Changelog
+## Why SQLite WAL Mode?
 
-See [CHANGELOG.md](./CHANGELOG.md) for full version history.
+WAL (Write-Ahead Logging) mode means:
+- **Reads don't block writes** — UI stays responsive while billing
+- **Atomic transactions** — a power failure mid-write won't corrupt the database
+- **Crash recovery** — WAL log is replayed automatically on next open
 
----
-
-## 📄 License
-
-**MIT © 2026 Ayush Kaushik**
-
-> The client (Bloom Cafe / Sarthak Adwani) holds a perpetual license to use and operate this software.
+Critical for a café environment where power cuts and abrupt shutdowns are common.
 
 ---
 
-<div align="center">
+## License
 
-```
-Built with ☕ and Node.js by Ayush Kaushik
-coc123.1607@gmail.com
-```
-
-*Point of Sale system delivered to Bloom Cafe, 2026*
-
-</div>
-
+MIT — see [LICENSE](LICENSE)
 
 ---
 
-## 🔍 Inspect & Debug Locally
-
-This section covers how to run, inspect, and test Bloom Cafe POS on your Windows machine (or cross-platform in dev mode).
-
-### 1. Clone & Run in Dev Mode
-
-```bash
-git clone https://github.com/ww2d2vjh8c-lab/POS-BASIC-BILLING
-cd POS-BASIC-BILLING
-npm install
-npm start          # Electron window opens automatically
-```
-
-> **Note:** The app is built for Windows. Dev mode works on any OS, but thermal printer integration and the NSIS installer require Windows.
-
-### 2. Build the Windows Installer Locally
-
-```bash
-npm run build:win
-# → dist/Bloom Cafe POS Setup 1.2.0.exe
-```
-
-Requires Windows or the GitHub Actions CI workflow (which builds on `windows-latest` automatically on every push to `main`).
-
-### 3. Open Electron DevTools
-
-While the app is running, press **`Ctrl + Shift + I`** (or `F12`) inside the Electron window.
-
-This opens Chromium DevTools attached to the renderer process. From here:
-
-- **Console** — see `window.electronAPI.*` calls, IPC bridge events, and any renderer-side errors
-- **Sources** — browse and set breakpoints in `src/renderer/js/*.js` files
-- **Elements** — inspect the live DOM, CSS, and layout of every screen
-- **Network** — not applicable (fully offline), but useful if you add any external calls
-
-To enable DevTools programmatically (in case keyboard shortcut doesn't work), add this to `src/main/main.js`:
-
-```js
-mainWindow.webContents.openDevTools();
-```
-
-### 4. Debug the Main Process (Node.js)
-
-The main process runs in Node.js and handles all IPC, DB, and printer logic. To debug it:
-
-```bash
-npm start -- --inspect
-```
-
-Then open **`chrome://inspect`** in Chrome → click *inspect* under Remote Target. Set breakpoints in `src/main/ipc/*.ipc.js`, `src/main/db/queries.js`, or any service file.
-
-### 5. Inspect the SQLite Database Directly
-
-The live database sits at:
-
-```
-Windows: %APPDATA%\Bloom Cafe POS\bloom-cafe.db
-Dev mode: same path (the app always writes to AppData)
-```
-
-Use **[DB Browser for SQLite](https://sqlitebrowser.org/)** (free) to inspect it:
-
-1. Download and install DB Browser for SQLite
-2. Open `bloom-cafe.db`
-3. Browse the **Browse Data** tab — key tables:
-
-| Table | What it contains |
-|-------|----------------|
-| `bills` | Every finalized bill with payment method, cash received, totals |
-| `orders` | Active table sessions |
-| `inventory` | Stock levels, product links, restock history |
-| `products` | Menu items, add-ons, pricing |
-| `audit_log` | Full trail of every action (actor, action, target, timestamp) |
-
-4. Use the **Execute SQL** tab to run queries, e.g.:
-
-```sql
-SELECT * FROM bills ORDER BY created_at DESC LIMIT 10;
-SELECT * FROM audit_log WHERE action = 'finalize_bill';
-SELECT p.name, i.quantity FROM inventory i JOIN products p ON i.product_id = p.id;
-```
-
-> **Tip:** The DB runs in WAL mode. In DB Browser, click **Write Changes** after the app writes to see the latest data without reopening the file.
-
-### 6. Test the Full Order → Bill → Print Flow
-
-1. Run `npm start` and select a table
-2. Add menu items to the cart (test add-ons, Half/Full variants, and discounts)
-3. Open Bill Preview → choose Cash, UPI, or Card
-4. For Cash: enter received amount — the change calculator should block short payments
-5. Click **Finalize Bill** — the atomic DB transaction runs: inventory deducted, bill number generated, audit log written
-6. Check the **Dashboard** (left nav) — the new bill appears immediately with correct totals
-7. In DB Browser: `SELECT * FROM bills ORDER BY created_at DESC LIMIT 1` — inspect every field
-
-### 7. Test Thermal Printing Without a Printer
-
-In **Settings → Printer**, select any available printer or use **Microsoft Print to PDF** (built into Windows) to print receipts to a PDF file instead of physical paper.
-
-This lets you verify the 58mm receipt layout, item formatting, and cash/change display without any hardware.
-
-### 8. View App Logs
-
-Structured logs are written to:
-
-```
-Windows: %APPDATA%\Bloom Cafe POS\logs\
-```
-
-Tail the log file in PowerShell to watch events in real time:
-
-```powershell
-Get-Content "$env:APPDATA\Bloom Cafe POS\logs\app.log" -Wait -Tail 50
-```
-
-### 9. Run Tests
-
-```bash
-npm test                   # Jest — all unit tests
-npm run test:coverage      # With coverage report
-```
-
-Current test coverage targets: `validator.js`, `analytics.service.js`, `file.service.js`
+<p align="center">Built by <a href="https://github.com/ww2d2vjh8c-lab">Ayush Kaushik</a> · Delivered to and running at Bloom Cafe</p>
