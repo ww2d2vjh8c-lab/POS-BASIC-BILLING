@@ -388,6 +388,10 @@ async function finalizeBill() {
     if (finalBill && finalBill.billNo) {
       renderBillContent(finalBill);
       showToast(`Bill #${finalBill.billNo} finalized successfully!`);
+      if (Array.isArray(finalBill.stockWarnings) && finalBill.stockWarnings.length) {
+        const names = finalBill.stockWarnings.map(w => `${w.name} (short ${w.short})`).join(", ");
+        setTimeout(() => showToast(`Stock count too low for: ${names}. Please update inventory.`, "warning"), 1500);
+      }
 
       const autoPrint = localStorage.getItem("autoPrintAfterFinalize") === "true";
 

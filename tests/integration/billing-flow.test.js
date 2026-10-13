@@ -156,3 +156,42 @@ test('list-printers reports what will be used', async () => {
   const r = await call('list-printers');
   expect(r.data.detected).toEqual({ name: 'Office Laser', reason: 'default' });
 });
+
+test('overselling keeps stock at 0, warns, and delete restores only real units', async () => {
+  await call('add-inventory-item', { name: 'Last Muffin', stock: 1, lowStock: 1 });
+  await call('add-to-order', 'Table 7', { name: 'Last Muffin', price: 40 });
+  await call('increase-cart-item-quantity', 'Table 7', 0);
+  await call('increase-cart-item-quantity', 'Table 7', 0); // 3 sold, 1 in stock
+  const r = await call('finalize-bill', { orderId: 'Table 7', paymentMode: 'Cash' });
+  expect(r.success).toBe(true);
+  expect(r.data.stockWarnings).toEqual([{ name: 'Last Muffin', sold: 3, inStock: 1, short: 2 }]);
+  const stockOf = async () => ((await call('get-inventory')).data.items.find(i => i.name === 'Last Muffin').stock);
+  expect(await stockOf()).toBe(0);
+  const log = (await call('get-inventory-audit-log')).data;
+  expect(log.some(e => e.reason === 'oversold' && e.bill_no === r.data.billNo && e.quantity_change === -2)).toBe(true);
+
+  await call('delete-bill', r.data.billNo);
+  expect(await stockOf()).toBe(1); // not 3
+});
+
+test('deleting a bill is all-or-nothing', async () => {
+  await call('add-inventory-item', { name: 'Atomic Tea', stock: 5, lowStock: 1 });
+  await call('add-to-order', 'Table 8', { name: 'Atomic Tea', price: 10 });
+  const r = await call('finalize-bill', { orderId: 'Table 8', paymentMode: 'UPI' });
+  // Break the restore step: the bill must survive.
+  const { getDB } = require('../../src/main/db/database');
+  getDB().exec("CREATE TRIGGER fail_restore BEFORE UPDATE ON inventory WHEN NEW.stock > OLD.stock BEGIN SELECT RAISE(ABORT, 'disk error'); END;");
+  const del = await call('delete-bill', r.data.billNo);
+  getDB().exec('DROP TRIGGER fail_restore');
+  expect(del.success).toBe(false);
+  const { getToday } = require('../../src/main/services/file.service');
+  const bills = (await call('get-sales-data', getToday())).data.bills;
+  expect(bills.some(b => b.billNo === r.data.billNo)).toBe(true);
+  expect((await call('delete-bill', r.data.billNo)).success).toBe(true);
+});
+
+test('an unexpected error does not close the app', () => {
+  const src = fs.readFileSync(path.join(__dirname, '../../src/main/main.js'), 'utf8');
+  const handler = src.slice(src.indexOf("process.on('uncaughtException'"));
+  expect(handler.slice(0, handler.indexOf('});'))).not.toMatch(/app\.(quit|exit)/);
+});

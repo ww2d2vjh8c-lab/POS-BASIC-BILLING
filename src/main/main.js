@@ -167,8 +167,10 @@ process.on('unhandledRejection', (reason) => {
   logEvent({ type: 'MAIN_UNHANDLED_REJECTION', reason: reason?.toString(), stack: reason?.stack });
 });
 process.on('uncaughtException', (error) => {
-  logEvent({ type: 'MAIN_UNCAUGHT_EXCEPTION', message: error.message, stack: error.stack });
-  app.quit();
+  // Log and keep running: closing the till mid-service loses the cashier's
+  // work, and every write is already in a SQLite transaction.
+  logEvent({ type: 'MAIN_UNCAUGHT_EXCEPTION', message: error?.message, stack: error?.stack });
+  logger.error('MAIN_UNCAUGHT_EXCEPTION', { error: error?.message });
 });
 
 // ── Recurring background tasks ────────────────────────────────────────────────
