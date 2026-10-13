@@ -1,5 +1,10 @@
 const { getDB } = require("./database");
 
+/** YYYY-MM-DD in local time (bills are stored by local business date, not UTC). */
+function localDate(d = new Date()) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 /**
  * Calculates the total cost of a cart items array.
  * Single source of truth — used by all IPC handlers that touch cart totals.
@@ -443,7 +448,7 @@ function readSessions() {
   orders.forEach(o => {
     try { sessions[o.order_id] = JSON.parse(o.items); } catch(e) { sessions[o.order_id] = []; }
   });
-  return { date: new Date().toISOString().split("T")[0], sessions };
+  return { date: localDate(), sessions };
 }
 
 function saveSession(orderId, sessionOrItems) {
@@ -541,7 +546,7 @@ function finalizeOrder(bill, items, shouldDeductInventory) {
     }
 
     // Step 2 — Generate bill number (call generateBillNo inside same tx):
-    const billDate = bill.billDate || bill.bill_date || new Date().toISOString().split("T")[0];
+    const billDate = bill.billDate || bill.bill_date || localDate();
     const freshBillNo = generateBillNo(billDate);
 
     // Step 3 — Insert bill:
@@ -613,7 +618,7 @@ function getWeeklyRevenue() {
   for (let i = 6; i >= 0; i--) { 
     const d = new Date(); 
     d.setDate(d.getDate() - i); 
-    dates.push(d.toISOString().split("T")[0]); 
+    dates.push(localDate(d)); 
   } 
  
   const placeholders = dates.map(() => "?").join(","); 

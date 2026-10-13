@@ -59,6 +59,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   // ── Printer ──
   getPrinterConfig: () => ipcRenderer.invoke("get-printer-config"),
   savePrinterConfig: (config) => ipcRenderer.invoke("save-printer-config", config),
+  listPrinters: () => ipcRenderer.invoke("list-printers"),
 
   // ── Backup ──
   createBackup: () => ipcRenderer.invoke("create-backup"),

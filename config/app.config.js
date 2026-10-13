@@ -31,6 +31,9 @@ module.exports = {
   /** Maximum number of print attempts before giving up. */
   MAX_PRINT_ATTEMPTS:      3,
 
+  /** Base delay between print retries (ms); multiplied by the attempt number. */
+  PRINT_RETRY_DELAY_MS:    1000,
+
   /** 58mm paper width in microns for webContents.print(). */
   PAGE_WIDTH_MICRONS:      58000,
 

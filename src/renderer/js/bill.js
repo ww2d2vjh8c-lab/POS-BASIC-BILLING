@@ -455,6 +455,9 @@ async function printBill(billNo) {
   const billContent = document.getElementById("billContent");
   const billModal = document.getElementById("billModal");
   if (!billContent) { showToast("Nothing to print", "error"); return; }
+  // Restore the modal to how we found it, so printing after finalize does not
+  // leave a stale bill preview covering the table view.
+  const modalWasVisible = billModal && billModal.style.display === "block";
   if (billModal) billModal.style.display = "block";
   billContent.style.display = "block";
   // Small delay so the DOM fully renders before Chromium captures the print view
@@ -468,13 +471,15 @@ async function printBill(billNo) {
       }
       showToast("Print failed: " + (result?.error || "Unknown error"), "error");
     } else {
-      showToast("Receipt printed!");
+      showToast(result.printer ? `Receipt printed on ${result.printer}` : "Receipt printed!");
       if (billNo) {
         await window.electronAPI.markBillPrinted(billNo);
       }
     }
   } catch (error) {
     showToast("Print error: " + error.message, "error");
+  } finally {
+    if (billModal && !modalWasVisible) billModal.style.display = "none";
   }
 }
 

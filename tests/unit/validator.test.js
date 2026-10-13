@@ -85,7 +85,7 @@ describe('validateSettings', () => {
     });
     expect(result).toEqual({ numberOfTables: 10, cafeName: 'Bloom Cafe' });
     expect(result).not.toHaveProperty('maliciousKey');
-    expect(result).not.toHaveProperty('__proto__');
+    expect(Object.prototype.hasOwnProperty.call(result, '__proto__')).toBe(false);
   });
 
   test('allows all defined setting keys', () => {

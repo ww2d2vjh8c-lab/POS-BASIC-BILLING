@@ -31,6 +31,9 @@ if (!app || typeof app.getPath !== 'function') {
   process.exit(1);
 }
 
+// Allow tests / multi-store setups to point the app at an isolated data folder.
+if (process.env.POS_USER_DATA) app.setPath('userData', process.env.POS_USER_DATA);
+
 // ── Single-instance lock ──────────────────────────────────────────────────────
 if (!app.requestSingleInstanceLock()) {
   app.quit();
@@ -77,7 +80,7 @@ function createWindow() {
     width:  1200,
     height: 800,
     show:   false,
-    icon:   path.join(__dirname, '..', '..', '..', 'assets', 'icons', 'app-icon.png'),
+    icon:   path.join(__dirname, '..', '..', 'assets', 'icons', 'app-icon.png'),
     webPreferences: {
       nodeIntegration:        false,
       contextIsolation:       true,
@@ -101,7 +104,7 @@ function createWindow() {
 
   win.once('ready-to-show', () => win.show());
   win.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
-  if (isDev) win.webContents.openDevTools();
+  if (isDev && !process.env.POS_USER_DATA) win.webContents.openDevTools();
 }
 
 // ── Startup sequence ──────────────────────────────────────────────────────────
