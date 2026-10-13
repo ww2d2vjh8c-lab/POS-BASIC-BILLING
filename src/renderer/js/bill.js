@@ -388,6 +388,10 @@ async function finalizeBill() {
     if (finalBill && finalBill.billNo) {
       renderBillContent(finalBill);
       showToast(`Bill #${finalBill.billNo} finalized successfully!`);
+      if (Array.isArray(finalBill.stockWarnings) && finalBill.stockWarnings.length) {
+        const names = finalBill.stockWarnings.map(w => `${w.name} (short ${w.short})`).join(", ");
+        setTimeout(() => showToast(`Stock count too low for: ${names}. Please update inventory.`, "warning"), 1500);
+      }
 
       const autoPrint = localStorage.getItem("autoPrintAfterFinalize") === "true";
 
@@ -455,6 +459,9 @@ async function printBill(billNo) {
   const billContent = document.getElementById("billContent");
   const billModal = document.getElementById("billModal");
   if (!billContent) { showToast("Nothing to print", "error"); return; }
+  // Restore the modal to how we found it, so printing after finalize does not
+  // leave a stale bill preview covering the table view.
+  const modalWasVisible = billModal && billModal.style.display === "block";
   if (billModal) billModal.style.display = "block";
   billContent.style.display = "block";
   // Small delay so the DOM fully renders before Chromium captures the print view
@@ -468,13 +475,15 @@ async function printBill(billNo) {
       }
       showToast("Print failed: " + (result?.error || "Unknown error"), "error");
     } else {
-      showToast("Receipt printed!");
+      showToast(result.printer ? `Receipt printed on ${result.printer}` : "Receipt printed!");
       if (billNo) {
         await window.electronAPI.markBillPrinted(billNo);
       }
     }
   } catch (error) {
     showToast("Print error: " + error.message, "error");
+  } finally {
+    if (billModal && !modalWasVisible) billModal.style.display = "none";
   }
 }
 

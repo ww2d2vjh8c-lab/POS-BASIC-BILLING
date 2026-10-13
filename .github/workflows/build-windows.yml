@@ -3,6 +3,7 @@ name: Build Windows Installer
 on:
   push:
     branches: [main]
+  pull_request:
   workflow_dispatch:   # allows manual trigger from GitHub website
 
 jobs:
@@ -24,6 +25,12 @@ jobs:
 
       - name: Rebuild native modules for Windows
         run: npx electron-rebuild -f -w better-sqlite3
+
+      - name: Unit + integration tests
+        run: npm test
+
+      - name: End-to-end test (real app, human-style clicks)
+        run: npm run test:e2e
 
       - name: Build Windows installer
         run: npm run build:win

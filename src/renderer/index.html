@@ -542,7 +542,10 @@
     <div class="inv-form" style="padding: 20px;">
       <div class="input-row">
         <label>Printer Name:</label>
-        <input type="text" id="printerName" placeholder="e.g., Receipt Printer, EPSON TM-T88V" />
+        <input type="text" id="printerName" list="printerList" placeholder="Auto-detect (leave blank)" />
+        <datalist id="printerList"></datalist>
+        <button type="button" id="detectPrinterBtn" onclick="detectPrinters()">Detect</button>
+        <small id="printerDetectStatus"></small>
       </div>
       <div class="input-row">
         <label>

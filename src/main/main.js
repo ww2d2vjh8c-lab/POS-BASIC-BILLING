@@ -31,6 +31,9 @@ if (!app || typeof app.getPath !== 'function') {
   process.exit(1);
 }
 
+// Allow tests / multi-store setups to point the app at an isolated data folder.
+if (process.env.POS_USER_DATA) app.setPath('userData', process.env.POS_USER_DATA);
+
 // ── Single-instance lock ──────────────────────────────────────────────────────
 if (!app.requestSingleInstanceLock()) {
   app.quit();
@@ -77,7 +80,7 @@ function createWindow() {
     width:  1200,
     height: 800,
     show:   false,
-    icon:   path.join(__dirname, '..', '..', '..', 'assets', 'icons', 'app-icon.png'),
+    icon:   path.join(__dirname, '..', '..', 'assets', 'icons', 'app-icon.png'),
     webPreferences: {
       nodeIntegration:        false,
       contextIsolation:       true,
@@ -101,7 +104,7 @@ function createWindow() {
 
   win.once('ready-to-show', () => win.show());
   win.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
-  if (isDev) win.webContents.openDevTools();
+  if (isDev && !process.env.POS_USER_DATA) win.webContents.openDevTools();
 }
 
 // ── Startup sequence ──────────────────────────────────────────────────────────
@@ -164,8 +167,10 @@ process.on('unhandledRejection', (reason) => {
   logEvent({ type: 'MAIN_UNHANDLED_REJECTION', reason: reason?.toString(), stack: reason?.stack });
 });
 process.on('uncaughtException', (error) => {
-  logEvent({ type: 'MAIN_UNCAUGHT_EXCEPTION', message: error.message, stack: error.stack });
-  app.quit();
+  // Log and keep running: closing the till mid-service loses the cashier's
+  // work, and every write is already in a SQLite transaction.
+  logEvent({ type: 'MAIN_UNCAUGHT_EXCEPTION', message: error?.message, stack: error?.stack });
+  logger.error('MAIN_UNCAUGHT_EXCEPTION', { error: error?.message });
 });
 
 // ── Recurring background tasks ────────────────────────────────────────────────

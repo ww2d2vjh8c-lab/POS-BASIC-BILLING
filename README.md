@@ -184,10 +184,28 @@ The `.exe` installer is available as a GitHub Actions artifact on every successf
 
 ## Deployment (Client Delivery)
 
-1. Download `BloomCafePOS-Setup.exe` from GitHub Actions artifacts
-2. Run installer on client's Windows machine — one-click, no dependencies
-3. App auto-creates the SQLite database on first launch
-4. Configure menu items through the admin panel
+### One-click install from GitHub (client laptop)
+
+1. Install **Git for Windows** (https://git-scm.com) if it is not already there.
+2. Open Command Prompt and run:
+   ```
+   git clone https://github.com/ww2d2vjh8c-lab/POS-BASIC-BILLING.git
+   ```
+3. Open the `POS-BASIC-BILLING` folder and **double-click `INSTALL.bat`**.
+
+`INSTALL.bat` installs Node.js automatically if it is missing (via winget), installs
+dependencies, builds the app and installs it silently. A **Bloom Cafe POS** shortcut
+appears on the Desktop. Internet is only needed for this install — the app itself
+runs fully offline.
+
+**Updating later:** double-click `UPDATE.bat` (pulls the latest code and reinstalls).
+Sales, menu and settings are stored in the user's AppData folder and are kept.
+
+### Alternative: prebuilt installer
+
+Download `Bloom-Cafe-POS-Windows-Setup` from the GitHub Actions artifacts and run the `.exe`.
+
+The printer is auto-detected on the first print — no setup needed.
 
 ---
 

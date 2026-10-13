@@ -18,6 +18,7 @@ async function loadPrinterSettings() {
     if (autoPrintEl) {
       autoPrintEl.checked = localStorage.getItem("autoPrintAfterFinalize") === "true";
     }
+    await detectPrinters();
   } catch (error) {
     console.error("loadPrinterSettings error:", error);
   }
@@ -133,6 +134,40 @@ async function testPrinter() {
   } catch (error) {
     console.error("testPrinter error:", error);
     showToast("Printer test failed: " + error.message, "error");
+  }
+}
+
+// Fills the printer dropdown from the OS and shows which one will be used.
+async function detectPrinters() {
+  const listEl = document.getElementById("printerList");
+  const statusEl = document.getElementById("printerDetectStatus");
+  const nameEl = document.getElementById("printerName");
+  try {
+    if (!window.electronAPI.listPrinters) return;
+    const response = await window.electronAPI.listPrinters();
+    if (!response || !response.success) {
+      if (statusEl) statusEl.textContent = "Could not list printers";
+      return;
+    }
+    const { printers, detected } = response.data;
+    if (listEl) {
+      listEl.innerHTML = "";
+      printers.forEach(p => {
+        const opt = document.createElement("option");
+        opt.value = p.name;
+        opt.label = p.displayName + (p.isDefault ? " (default)" : "");
+        listEl.appendChild(opt);
+      });
+    }
+    if (statusEl) {
+      statusEl.textContent = detected && detected.name
+        ? `Will print to: ${detected.name} (${detected.reason === "saved" ? "saved" : "auto-detected"})`
+        : "No printer found — the print dialog will be shown";
+    }
+    if (nameEl && !nameEl.value && detected && detected.name) nameEl.value = detected.name;
+  } catch (error) {
+    console.error("detectPrinters error:", error);
+    if (statusEl) statusEl.textContent = "Could not list printers";
   }
 }
 

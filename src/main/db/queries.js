@@ -1,5 +1,10 @@
 const { getDB } = require("./database");
 
+/** YYYY-MM-DD in local time (bills are stored by local business date, not UTC). */
+function localDate(d = new Date()) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 /**
  * Calculates the total cost of a cart items array.
  * Single source of truth — used by all IPC handlers that touch cart totals.
@@ -443,7 +448,7 @@ function readSessions() {
   orders.forEach(o => {
     try { sessions[o.order_id] = JSON.parse(o.items); } catch(e) { sessions[o.order_id] = []; }
   });
-  return { date: new Date().toISOString().split("T")[0], sessions };
+  return { date: localDate(), sessions };
 }
 
 function saveSession(orderId, sessionOrItems) {
@@ -522,27 +527,36 @@ function peekNextBillNo(date) {
 
 function finalizeOrder(bill, items, shouldDeductInventory) {
   const db = getDB();
+  const stockWarnings = [];
 
   const tx = db.transaction(() => {
-    // Step 1 — If shouldDeductInventory is true, deduct inventory:
+    // Step 1 — Generate bill number first so stock changes can reference it:
+    const billDate = bill.billDate || bill.bill_date || localDate();
+    const freshBillNo = generateBillNo(billDate);
+
+    // Step 2 — If shouldDeductInventory is true, deduct inventory:
     if (shouldDeductInventory) {
       items.forEach(item => {
         const base = item.name.replace(/\s*\(Half\)|\s*\(Full\)/gi, "").trim();
         const qty = item.quantity || 1;
-        const result = db.prepare(
-          "UPDATE inventory SET stock = MAX(0, stock - ?) WHERE LOWER(name) = LOWER(?)"
-        ).run(qty, base);
-        if (result.changes === 0) {
+        const row = db.prepare("SELECT stock FROM inventory WHERE LOWER(name) = LOWER(?)").get(base);
+        if (!row) {
           console.warn("[INVENTORY_MISS] No match for:", base);
-        } else {
-          writeInventoryAuditLog(base, -qty, 'deducted', 'sale', null); // bill_no added after insert
+          return;
+        }
+        db.prepare(
+          "UPDATE inventory SET stock = MAX(0, stock - ?), updated_at = datetime('now') WHERE LOWER(name) = LOWER(?)"
+        ).run(qty, base);
+        writeInventoryAuditLog(base, -Math.min(qty, row.stock), 'deducted', 'sale', freshBillNo);
+        // Selling more than recorded stock: keep stock at 0 but record the
+        // shortfall so the owner can see the count was wrong.
+        if (qty > row.stock) {
+          const short = qty - row.stock;
+          writeInventoryAuditLog(base, -short, 'oversold', 'sale', freshBillNo);
+          stockWarnings.push({ name: base, sold: qty, inStock: row.stock, short });
         }
       });
     }
-
-    // Step 2 — Generate bill number (call generateBillNo inside same tx):
-    const billDate = bill.billDate || bill.bill_date || new Date().toISOString().split("T")[0];
-    const freshBillNo = generateBillNo(billDate);
 
     // Step 3 — Insert bill:
     const cashReceivedVal = (bill.paymentMode === "Cash" && bill.cashReceived != null)
@@ -566,15 +580,40 @@ function finalizeOrder(bill, items, shouldDeductInventory) {
     return freshBillNo;
   });
 
-  return tx();
+  const billNo = tx();
+  if (stockWarnings.length) bill.stockWarnings = stockWarnings;
+  return billNo;
 }
 
-function deleteBill(billNo) {
+/**
+ * Delete a bill and (optionally) put its items back into stock in ONE
+ * transaction, so a failure can never leave a deleted bill with stock missing.
+ */
+function deleteBill(billNo, restoreStock = false) {
   const db = getDB();
-  const bill = db.prepare("SELECT * FROM bills WHERE bill_no = ?").get(billNo);
-  if (!bill) return null;
-  db.prepare("DELETE FROM bills WHERE bill_no = ?").run(billNo);
-  return { ...bill, items: (() => { try { return JSON.parse(bill.items); } catch(e) { return []; } })() };
+  const tx = db.transaction(() => {
+    const bill = db.prepare("SELECT * FROM bills WHERE bill_no = ?").get(billNo);
+    if (!bill) return null;
+    let items = [];
+    try { items = JSON.parse(bill.items); } catch (_e) { items = []; }
+    db.prepare("DELETE FROM bills WHERE bill_no = ?").run(billNo);
+    if (restoreStock && Array.isArray(items) && items.length) {
+      // Units that were oversold never came out of stock, so don't add them back.
+      const oversold = {};
+      db.prepare(
+        "SELECT LOWER(item_name) AS n, SUM(-quantity_change) AS q FROM inventory_audit_log WHERE bill_no = ? AND reason = 'oversold' GROUP BY LOWER(item_name)"
+      ).all(billNo).forEach(r => { oversold[r.n] = r.q; });
+      const toRestore = items.map(it => {
+        const key = it.name.replace(/\s*\(Half\)|\s*\(Full\)/gi, "").trim().toLowerCase();
+        const skip = Math.min(oversold[key] || 0, it.quantity || 1);
+        oversold[key] = (oversold[key] || 0) - skip;
+        return { ...it, quantity: (it.quantity || 1) - skip };
+      }).filter(it => it.quantity > 0);
+      if (toRestore.length) restoreInventory(toRestore);
+    }
+    return { ...bill, items };
+  });
+  return tx();
 }
 
 function writeAuditLog(action, entityType, entityId, before, after) { 
@@ -613,7 +652,7 @@ function getWeeklyRevenue() {
   for (let i = 6; i >= 0; i--) { 
     const d = new Date(); 
     d.setDate(d.getDate() - i); 
-    dates.push(d.toISOString().split("T")[0]); 
+    dates.push(localDate(d)); 
   } 
  
   const placeholders = dates.map(() => "?").join(","); 

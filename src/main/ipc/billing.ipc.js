@@ -63,6 +63,7 @@ function register(ipcMain) {
         queries.removeSession(orderId);
         delete activeOrders[orderId];
 
+        if (finalBill.stockWarnings) logger.warn('STOCK_OVERSOLD', { billNo: savedBillNo, items: finalBill.stockWarnings });
         logger.info('BILL_FINALIZE_SUCCESS', { billNo: savedBillNo, total: finalBill.total });
         logEvent({ type: 'BILL_FINALIZED', billNo: savedBillNo, total: finalBill.total });
         return { success: true, data: finalBill };
@@ -79,15 +80,11 @@ function register(ipcMain) {
   ipcMain.handle('delete-bill', async (_e, billNo) => {
     try {
       logger.info('BILL_DELETE', { billNo });
-      const deletedBill = queries.deleteBill(billNo);
+      const settings    = queries.readSettings();
+      const deletedBill = queries.deleteBill(billNo, !!settings.inventoryEnabled);
       if (!deletedBill) return { success: false, error: 'Bill not found' };
 
       queries.writeAuditLog('BILL_DELETED', 'bill', billNo, deletedBill, null);
-
-      const settings = queries.readSettings();
-      if (settings.inventoryEnabled && Array.isArray(deletedBill.items)) {
-        try { queries.restoreInventory(deletedBill.items); } catch (_e) {}
-      }
 
       logEvent({ type: 'BILL_DELETED', billNo });
       return { success: true };
