@@ -168,6 +168,8 @@ document.getElementById("enter-btn").onclick = async () => {
     await loadCategories();
     await loadSettings();
     showTableView(); // Show the table view first
+    // Recovery / degraded-database notices (after the main screen is visible).
+    if (typeof checkSystemHealthOnEnter === "function") checkSystemHealthOnEnter();
   } catch (error) {
     console.error("enter POS error:", error);
     showToast("Failed to start POS", "error");

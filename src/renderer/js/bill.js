@@ -96,12 +96,14 @@ function buildReceiptText(billData, { isPreview = false } = {}) {
     total += itemTotal;
     totalItems += quantity;
 
-    itemsText += formatReceiptLine(index + 1, item.name, quantity, formatPrice(itemTotal)) + "\n";
+    // Item line shows the item alone and each add-on line its own amount
+    // (x quantity), so the printed amounts add up exactly to the total.
+    itemsText += formatReceiptLine(index + 1, item.name, quantity, formatPrice((item.price || 0) * quantity)) + "\n";
 
     // Add-on lines - compact format
     if (Array.isArray(item.addons) && item.addons.length > 0) {
       item.addons.forEach(addon => {
-        itemsText += formatReceiptLine("", "+" + String(addon.name || "").substring(0, 12), "", formatPrice(addon.price || 0)) + "\n";
+        itemsText += formatReceiptLine("", "+" + String(addon.name || "").substring(0, 12), "", formatPrice((addon.price || 0) * quantity)) + "\n";
       });
     }
   });
@@ -496,7 +498,11 @@ function _showPrintConfirm(finalBill) {
   const skipBtn = document.getElementById("skipPrintBtn");
   if (!printBtn || !skipBtn) { showTableView(); return; }
 
-  if (meta) meta.textContent = `Bill #${finalBill.billNo} · ${finalBill.paymentMode || "Cash"}`;
+  const disc = Number(finalBill.discountAmount) || 0;
+  if (meta) {
+    meta.textContent = `Bill #${finalBill.billNo} · ${finalBill.paymentMode || "Cash"}` +
+      (disc > 0 ? ` · includes ${formatMoney(disc)} discount` : "");
+  }
   if (totalEl) totalEl.textContent = formatMoney(finalBill.total || 0);
   if (changeEl) {
     const change = typeof finalBill.cashReceived === "number" ? finalBill.cashReceived - (finalBill.total || 0) : 0;

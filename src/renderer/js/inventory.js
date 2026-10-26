@@ -284,6 +284,8 @@ async function adjustStock(itemName, delta) {
         renderStockTab();
         _renderSummaryBar();
         showToast(result.error || 'Failed to update stock', 'error');
+        // The item was removed/renamed elsewhere — show what is really there now.
+        if (result.error === 'Item not found') await _loadAllInventoryData();
       }
     } catch (e) {
       console.error('adjustStock error:', e);

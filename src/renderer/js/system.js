@@ -16,6 +16,13 @@ function _formatBackupDay(dateStr) {
   return d.toLocaleDateString("en-IN", { weekday: "short", day: "2-digit", month: "short", year: "numeric" });
 }
 
+// "26 Oct, 9:26 pm"
+function _formatWhen(iso) {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  return `${d.toLocaleDateString("en-IN", { day: "numeric", month: "short" })}, ${_formatClock(iso)}`;
+}
+
 function _formatClock(iso) {
   const d = new Date(iso);
   if (isNaN(d.getTime())) return "";
@@ -40,8 +47,8 @@ async function loadBackupSummary() {
   if (!ok) { el.textContent = "Could not read backups"; return; }
   if (list.length === 0) { el.textContent = "No backups yet"; return; }
   const latest = list[0];
-  const time = _formatClock(latest.modifiedAt);
-  el.textContent = `Last saved ${formatDisplayDate(latest.date)}${time ? ", " + time : ""} · ${list.length} kept`;
+  const when = _formatWhen(latest.modifiedAt) || latest.date;
+  el.textContent = `Last saved ${when} · ${list.length} kept`;
 }
 
 async function openBackups() {
@@ -194,7 +201,7 @@ function _showRecoveryNotice(rec) {
   try { if (localStorage.getItem(key) === stamp) return; } catch (_) {}
 
   const manual = rec.reason === "manual restore";
-  const when = rec.at ? `${formatDisplayDate(todayStrFrom(rec.at))}, ${_formatClock(rec.at)}` : "";
+  const when = rec.at ? _formatWhen(rec.at) : "";
   const fromDay = rec.restoredFrom ? _formatBackupDay(rec.restoredFrom) : null;
   const kept = rec.preservedAs ? String(rec.preservedAs).split(/[\\/]/).pop() : null;
 
@@ -218,12 +225,6 @@ function _showRecoveryNotice(rec) {
     tone: manual ? "success" : "warning",
     onClose: () => { try { localStorage.setItem(key, stamp); } catch (_) {} },
   });
-}
-
-function todayStrFrom(iso) {
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return todayStr();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 async function checkSystemHealthOnEnter() {
