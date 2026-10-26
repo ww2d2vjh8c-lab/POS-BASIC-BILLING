@@ -114,6 +114,18 @@ test('restore-backup brings the data back, keeps the replaced file, and restarts
   database.getDB(); // the mocked "restart" closed it
 });
 
+test('after the restart, the restore is confirmed once', async () => {
+  const startup = require('../../src/main/services/startup.service');
+  database.setRecoveryInfo(null);           // a real restart starts with empty memory
+  startup.initDataLayer();
+  expect(database.getDatabaseState().recovery).toMatchObject({ reason: 'manual restore', restoredFrom: today() });
+  expect(require('../../src/main/db/queries').readSettings()).not.toHaveProperty('pendingRecoveryNotice');
+
+  database.setRecoveryInfo(null);           // the launch after that: nothing to show
+  startup.initDataLayer();
+  expect(database.getDatabaseState().recovery).toBeNull();
+});
+
 test('restore-backup only accepts an existing dated backup', async () => {
   const before = fs.readdirSync(mockTmp).sort();
   for (const bad of ['../../etc', `${today()}/../..`, '..', '', null, 42, '1999-01-01']) {

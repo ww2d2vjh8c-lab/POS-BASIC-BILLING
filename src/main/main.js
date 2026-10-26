@@ -75,7 +75,7 @@ function createWindow() {
     width:  1200,
     height: 800,
     show:   false,
-    icon:   path.join(__dirname, '..', '..', 'assets', 'icons', 'app-icon.png'),
+    icon:   path.join(__dirname, '..', '..', 'assets', 'icons', 'app-logo-256.png'),
     webPreferences: secureWebPreferences(path.join(__dirname, 'preload.js')),
   });
 

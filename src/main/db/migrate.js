@@ -89,6 +89,30 @@ function migrateProductAddons(db, userData) {
 }
 
 /**
+ * Migration v6: Link inventory rows to their menu product by name.
+ * Seeded and manually added stock items had no product_id, so the Inventory
+ * screen showed them as "Uncategorized" / "Not Connected" even when a menu
+ * product with the same name exists. Only links when exactly one active
+ * product matches (names are unique per category, not globally).
+ */
+function runMigrationV6(db) {
+  logger.info("MIGRATE_V6_START");
+  db.transaction(() => {
+    const linked = db.prepare(`
+      UPDATE inventory
+      SET product_id = (
+        SELECT p.id FROM products p WHERE LOWER(p.name) = LOWER(inventory.name)
+      ), updated_at = datetime('now')
+      WHERE product_id IS NULL
+        AND archived = 0
+        AND (SELECT COUNT(*) FROM products p WHERE LOWER(p.name) = LOWER(inventory.name)) = 1
+    `).run().changes;
+    setMigrationVersion(6);
+    logger.info("MIGRATE_V6_COMPLETE", { linked });
+  })();
+}
+
+/**
  * Migration v5: Money and stock bookkeeping on bills.
  * - discount_amount: the discount given, so subtotal = total + discount_amount
  *   and reports / reprints show it (previously it was applied and forgotten).
@@ -169,6 +193,7 @@ const SCHEMA_MIGRATIONS = [
   [3, runMigrationV3],
   [4, runMigrationV4],
   [5, runMigrationV5],
+  [6, runMigrationV6],
 ];
 
 /** v1: one-time import of the legacy menu.json / inventory.json files. */

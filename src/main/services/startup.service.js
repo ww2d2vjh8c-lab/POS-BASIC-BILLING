@@ -95,6 +95,10 @@ function initDataLayer() {
   runStep('DATA_FILES', ensureDataFilesExist);
   const status = openDatabaseWithRecovery();
   runStep('MIGRATIONS', migrateFromJSON);
+  runStep('PENDING_RECOVERY_NOTICE', () => {
+    const pending = backup.takePendingRecoveryNotice();
+    if (pending && !status.recovered) database.setRecoveryInfo(pending);
+  });
   runStep('SESSIONS', loadSessions);
   runStep('BACKUP', () => {
     backup.ensureBackupDirectory();

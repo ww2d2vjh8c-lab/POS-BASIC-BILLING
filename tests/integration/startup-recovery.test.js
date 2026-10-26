@@ -139,7 +139,7 @@ test('with no backup, a damaged file is set aside and a fresh database starts', 
   expect(preservedFiles(dir, 'corrupt')).toHaveLength(1);
   const db = m.database.getDB();
   expect(db.prepare('SELECT COUNT(*) AS c FROM categories').get().c).toBeGreaterThan(0);
-  expect(m.migrate.getMigrationVersion()).toBe(5);
+  expect(m.migrate.getMigrationVersion()).toBe(6);
 });
 
 test('damaged pages with no good backup: keep billing, flag it, and do not overwrite backups', async () => {
@@ -229,7 +229,7 @@ test('a migration whose column could not be added is not marked as done', () => 
 
   // Next launch: the disk is fine again and the migration completes.
   m.migrate.migrateFromJSON();
-  expect(m.migrate.getMigrationVersion()).toBe(5);
+  expect(m.migrate.getMigrationVersion()).toBe(6);
   const cols = db.prepare('PRAGMA table_info(bills)').all().map(c => c.name);
   expect(cols).toEqual(expect.arrayContaining(['cash_received', 'discount_amount', 'stock_deducted']));
 });
@@ -240,7 +240,7 @@ test('a damaged legacy menu.json does not stop the schema migrations', () => {
   const m = boot(dir);
   m.database.getDB();
   expect(() => m.migrate.migrateFromJSON()).not.toThrow();
-  expect(m.migrate.getMigrationVersion()).toBe(5);
+  expect(m.migrate.getMigrationVersion()).toBe(6);
   const cols = m.database.getDB().prepare('PRAGMA table_info(bills)').all().map(c => c.name);
   expect(cols).toContain('discount_amount');
 });
@@ -262,4 +262,27 @@ test('the bill counter is rebuilt from the highest bill number, not the count', 
   expect(db2.prepare("SELECT last_number FROM bill_sequences WHERE bill_date = '2026-01-01'").get().last_number).toBe(5);
   const queries = require('../../src/main/db/queries');
   expect(db2.transaction(() => queries.generateBillNo('2026-01-01'))()).toBe('BC-20260101-6');
+});
+
+test('seeded stock items are linked to the menu product with the same name', () => {
+  const m = boot();
+  const db = m.database.getDB();
+  // Two categories with the same product name: ambiguous, must stay unlinked.
+  db.prepare("INSERT INTO categories (name) VALUES ('Combo A'), ('Combo B')").run();
+  for (const cat of ['Combo A', 'Combo B']) {
+    db.prepare("INSERT INTO products (category_id, name, price) SELECT id, 'Twin Meal', 99 FROM categories WHERE name = ?").run(cat);
+  }
+  db.prepare("INSERT INTO inventory (name, stock, low_stock_alert) VALUES ('Twin Meal', 3, 1)").run();
+  m.migrate.migrateFromJSON();
+
+  const chai = db.prepare(`
+    SELECT i.product_id, p.name AS product FROM inventory i LEFT JOIN products p ON p.id = i.product_id
+    WHERE LOWER(i.name) = 'chai'`).get();
+  expect(chai).toMatchObject({ product: 'Chai' });
+  expect(db.prepare("SELECT product_id FROM inventory WHERE name = 'Twin Meal'").get().product_id).toBeNull();
+  const unlinked = db.prepare(`
+    SELECT COUNT(*) AS c FROM inventory i
+    WHERE i.product_id IS NULL AND i.archived = 0
+      AND (SELECT COUNT(*) FROM products p WHERE LOWER(p.name) = LOWER(i.name)) = 1`).get().c;
+  expect(unlinked).toBe(0);
 });

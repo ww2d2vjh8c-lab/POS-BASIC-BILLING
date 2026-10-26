@@ -21,6 +21,8 @@ const { migrateFromJSON } = require('../db/migrate');
 const cfg = require('../../../config/app.config');
 
 const BACKUP_DIR_RE = /^\d{4}-\d{2}-\d{2}$/;
+/** settings key holding a manual restore's info across the restart. */
+const PENDING_RECOVERY_KEY = 'pendingRecoveryNotice';
 
 // ── Directory bootstrap ───────────────────────────────────────────────────────
 function ensureBackupDirectory() {
@@ -185,9 +187,12 @@ function restoreBackup(date) {
     const { preservedAs } = replaceDatabaseFile(backup.path, 'before-restore');
     database.getDB();
     migrateFromJSON();
-    database.setRecoveryInfo({
-      at: new Date().toISOString(), reason: 'manual restore', restoredFrom: date, preservedAs,
-    });
+    const info = { at: new Date().toISOString(), reason: 'manual restore', restoredFrom: date, preservedAs };
+    database.setRecoveryInfo(info);
+    // The app restarts right after a restore, which clears the in-memory info;
+    // keep it in the restored database so the next launch can confirm it.
+    database.getDB().prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)')
+      .run(PENDING_RECOVERY_KEY, JSON.stringify(info));
     logger.warn('DATABASE_RESTORED_BY_USER', { from: date, previousSavedAs: preservedAs });
     logEvent({ type: 'DATABASE_RESTORED_BY_USER', from: date, previousSavedAs: preservedAs });
     return { success: true, data: { restoredFrom: date, previousSavedAs: preservedAs } };
@@ -228,7 +233,20 @@ function cleanOldBackups() {
   }
 }
 
+/**
+ * Returns (and forgets) the restore info saved before the last restart, so
+ * the "backup restored" notice is shown once after the app comes back.
+ */
+function takePendingRecoveryNotice() {
+  const db = database.getDB();
+  const row = db.prepare('SELECT value FROM settings WHERE key = ?').get(PENDING_RECOVERY_KEY);
+  if (!row) return null;
+  db.prepare('DELETE FROM settings WHERE key = ?').run(PENDING_RECOVERY_KEY);
+  try { return JSON.parse(row.value); } catch (_e) { return null; }
+}
+
 module.exports = {
+  PENDING_RECOVERY_KEY, takePendingRecoveryNotice,
   ensureBackupDirectory, createBackup, cleanOldBackups,
   listBackups, verifyBackupFile, findLatestGoodBackup, replaceDatabaseFile, restoreBackup,
 };
