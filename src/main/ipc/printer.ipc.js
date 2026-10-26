@@ -39,6 +39,7 @@ function register(ipcMain) {
 
   ipcMain.handle('save-printer-config', async (_e, config) => {
     try {
+      if (!config || typeof config !== 'object') return { success: false, error: 'Invalid printer config' };
       const safe = validateSettings({
         printerName:        config.printerName || '',
         useThermalPrinting: config.useThermalPrinting !== false,
@@ -84,7 +85,11 @@ function register(ipcMain) {
     const win = getWindow();
     if (!win) return { success: false, error: 'No window found' };
 
-    const settings      = queries.readSettings();
+    // A settings read failure must not stop the receipt: fall back to defaults.
+    let settings = {};
+    try { settings = queries.readSettings(); } catch (e) {
+      logger.error('IPC_ERROR', { channel: 'print-receipt', error: e.message });
+    }
     const savedPrinter  = (settings.printerName || '').trim();
     const directPrint   = settings.useThermalPrinting !== false && settings.useThermalPrinting !== 'false';
 

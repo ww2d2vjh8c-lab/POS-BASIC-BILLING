@@ -63,6 +63,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
   // ── Backup ──
   createBackup: () => ipcRenderer.invoke("create-backup"),
+  listBackups: () => ipcRenderer.invoke("list-backups"),
+  // Restores the given YYYY-MM-DD backup; on success the app restarts itself.
+  restoreBackup: (date) => ipcRenderer.invoke("restore-backup", date),
 
   // ── Logging ──
   logEvent: (data) => ipcRenderer.invoke("log-event", data),

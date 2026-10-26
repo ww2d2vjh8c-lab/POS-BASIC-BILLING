@@ -6,48 +6,59 @@
  * Channels: get-sales-data, get-dashboard-analytics, get-weekly-revenue,
  *           get-inventory-health
  *
- * Note: The old 'get-sales-by-date' channel was a duplicate of 'get-sales-data'.
- * It has been removed. All callers should use 'get-sales-data'.
+ * Note: 'get-sales-by-date' is an alias of 'get-sales-data', kept because the
+ * preload still exposes getSalesByDate(); without a handler it would reject.
  */
 
 const queries = require('../db/queries');
 const logger  = require('../logger');
 const { normalizeMenuForRenderer } = require('../services/file.service');
 const { computeAnalytics }         = require('../services/analytics.service');
+const { validateDate }             = require('../validator');
 
-const EMPTY_SALES = { totalRevenue: 0, totalBills: 0, bills: [] };
+const EMPTY_SALES = { totalRevenue: 0, totalDiscount: 0, grossRevenue: 0, totalBills: 0, bills: [] };
 const EMPTY_ANALYTICS = {
   topSellingProducts:      [],
   salesByCategory:         [],
   paymentModeDistribution: {},
   orderTypeDistribution:   { 'Dine-In': 0, 'Delivery': 0, 'Direct Bill': 0 },
   salesByHour:             Array(24).fill(0),
+  totalDiscount:           0,
+  grossRevenue:            0,
 };
+
+function isValidDate(date) {
+  try { validateDate(date); return true; } catch (_e) { return false; }
+}
 
 function register(ipcMain) {
 
-  ipcMain.handle('get-sales-data', async (_e, date) => {
+  const getSalesData = async (_e, date) => {
     try {
-      if (!date || typeof date !== 'string')
+      if (!isValidDate(date))
         return { success: false, error: 'Invalid date', data: EMPTY_SALES };
       const raw = queries.readSalesData(date);
       return {
         success: true,
         data: {
-          totalRevenue: Number(raw.totalRevenue) || 0,
-          totalBills:   Number(raw.totalBills)   || 0,
-          bills:        Array.isArray(raw.bills) ? raw.bills : [],
+          totalRevenue:  Number(raw.totalRevenue)  || 0,
+          totalDiscount: Number(raw.totalDiscount) || 0,
+          grossRevenue:  Number(raw.grossRevenue)  || 0,
+          totalBills:    Number(raw.totalBills)    || 0,
+          bills:         Array.isArray(raw.bills) ? raw.bills : [],
         },
       };
     } catch (e) {
       logger.error('IPC_ERROR', { channel: 'get-sales-data', error: e.message });
       return { success: false, error: e.message, data: EMPTY_SALES };
     }
-  });
+  };
+  ipcMain.handle('get-sales-data', getSalesData);
+  ipcMain.handle('get-sales-by-date', getSalesData);
 
   ipcMain.handle('get-dashboard-analytics', async (_e, date) => {
     try {
-      if (!date || typeof date !== 'string')
+      if (!isValidDate(date))
         return { success: false, error: 'Invalid date', data: EMPTY_ANALYTICS };
 
       const salesData = queries.readSalesData(date);

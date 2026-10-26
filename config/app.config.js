@@ -17,6 +17,15 @@ module.exports = {
   /** How many days to keep backup folders. Default: 7 days. */
   BACKUP_RETENTION_DAYS:   7,
 
+  /** Always keep at least this many of the newest backup folders, however old. */
+  BACKUP_MIN_KEEP:         3,
+
+  /** Delay before the app restarts after a backup restore (ms), so the reply reaches the UI. */
+  RESTART_AFTER_RESTORE_MS: 1500,
+
+  /** Longest renderer log entry kept (characters); the rest is cut off. */
+  MAX_RENDERER_LOG_CHARS:  8000,
+
   // ── IPC monitoring ─────────────────────────────────────────────────────────
   /** IPC calls slower than this (ms) are logged as SLOW_IPC. */
   SLOW_IPC_THRESHOLD_MS:   500,

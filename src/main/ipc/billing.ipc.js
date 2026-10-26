@@ -11,7 +11,17 @@ const logger  = require('../logger');
 const { logEvent }              = require('../logger');
 const { activeOrders, finalizingOrders } = require('../services/session.service');
 const { getToday }              = require('../services/file.service');
-const { validateBillPayload }   = require('../validator');
+const {
+  MAX_CASH, roundMoney, validateBillPayload, validateMoney, validateString,
+} = require('../validator');
+
+const toPaise = (rupees) => Math.round(rupees * 100);
+
+/** Discount in rupees, clamped to [0, subtotal]. Anything unusable means no discount. */
+function sanitizeDiscount(value, subtotal) {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) return 0;
+  return Math.min(roundMoney(value), subtotal);
+}
 
 function register(ipcMain) {
 
@@ -22,7 +32,7 @@ function register(ipcMain) {
     try {
       validateBillPayload(payload);
       logger.info('BILL_FINALIZE_START', { orderId: payload?.orderId });
-      const { orderId, paymentMode, cashReceived } = payload;
+      const { orderId, paymentMode } = payload;
 
       if (finalizingOrders.has(orderId)) {
         return { success: false, error: 'Bill is already being processed, please wait' };
@@ -30,38 +40,47 @@ function register(ipcMain) {
       finalizingOrders.add(orderId);
 
       try {
-        const session = activeOrders[orderId];
+        const session = Object.hasOwn(activeOrders, orderId) ? activeOrders[orderId] : null;
         if (!session)                               return { success: false, error: 'Order not found' };
         if (!session.items || session.items.length === 0) return { success: false, error: 'Cannot finalize empty order' };
 
-        const today    = getToday();
-        const settings = queries.readSettings();
-        const sessionTotal   = session.total || 0;
-        const discountAmount = (typeof payload.discountAmount === 'number' && payload.discountAmount >= 0)
-          ? Math.min(payload.discountAmount, sessionTotal)
-          : 0;
+        // Recompute from the items instead of trusting a cached total.
+        const subtotal       = queries.calculateCartTotal(session.items);
+        const discountAmount = sanitizeDiscount(payload.discountAmount, subtotal);
+        const total          = roundMoney(Math.max(0, subtotal - discountAmount));
+
+        let cashReceived = null;
+        if (paymentMode === 'Cash' && payload.cashReceived !== null && payload.cashReceived !== undefined) {
+          cashReceived = validateMoney(payload.cashReceived, 'Cash received', MAX_CASH);
+          if (toPaise(cashReceived) < toPaise(total)) {
+            return {
+              success: false,
+              error: `Cash received ₹${cashReceived.toFixed(2)} is less than the total ₹${total.toFixed(2)}`,
+            };
+          }
+        }
+
+        const settings  = queries.readSettings();
         const finalBill = {
           orderId,
           items:          session.items,
-          total:          Math.max(0, sessionTotal - discountAmount),
+          subtotal,
+          total,
           discountAmount,
-          paymentMode:    paymentMode || 'Cash',
-          billDate:       today,
+          paymentMode,
+          billDate:       getToday(),
           time:           new Date().toISOString(),
-          cashReceived:   ((paymentMode || 'Cash') === 'Cash' && typeof cashReceived === 'number')
-                            ? cashReceived
-                            : null,
+          cashReceived,
         };
 
-        const shouldDeduct = settings.inventoryEnabled && Array.isArray(session.items) && session.items.length > 0;
-        const savedBillNo  = queries.finalizeOrder(finalBill, session.items, shouldDeduct);
+        // Saves the bill, deducts stock and closes the saved cart atomically.
+        const savedBillNo  = queries.finalizeOrder(finalBill, session.items, !!settings.inventoryEnabled);
         finalBill.billNo   = savedBillNo;
+        delete activeOrders[orderId];
 
         queries.writeAuditLog('BILL_CREATED', 'bill', savedBillNo, null, {
-          total: finalBill.total, paymentMode: finalBill.paymentMode, items: finalBill.items?.length,
+          total: finalBill.total, discountAmount, paymentMode: finalBill.paymentMode, items: finalBill.items?.length,
         });
-        queries.removeSession(orderId);
-        delete activeOrders[orderId];
 
         if (finalBill.stockWarnings) logger.warn('STOCK_OVERSOLD', { billNo: savedBillNo, items: finalBill.stockWarnings });
         logger.info('BILL_FINALIZE_SUCCESS', { billNo: savedBillNo, total: finalBill.total });
@@ -72,13 +91,13 @@ function register(ipcMain) {
       }
     } catch (e) {
       logger.error('IPC_ERROR', { channel: 'finalize-bill', error: e.message });
-      if (payload?.orderId) finalizingOrders.delete(payload.orderId);
       return { success: false, error: e.message };
     }
   });
 
   ipcMain.handle('delete-bill', async (_e, billNo) => {
     try {
+      validateString(billNo, 'Bill number');
       logger.info('BILL_DELETE', { billNo });
       const settings    = queries.readSettings();
       const deletedBill = queries.deleteBill(billNo, !!settings.inventoryEnabled);
@@ -96,6 +115,7 @@ function register(ipcMain) {
 
   ipcMain.handle('mark-bill-printed', async (_e, billNo) => {
     try {
+      validateString(billNo, 'Bill number');
       queries.markBillPrinted(billNo);
       logger.info('BILL_MARKED_PRINTED', { billNo });
       return { success: true };
