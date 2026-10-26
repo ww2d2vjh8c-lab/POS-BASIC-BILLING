@@ -1,32 +1,34 @@
-// ================= BILL PREVIEW =================
+// ================= BILL PREVIEW / RECEIPT =================
 
-// Optimized for Everycom EC-58 58mm thermal printer (32 chars max)
+// Optimized for Everycom EC-58 58mm thermal printer (32 chars max per line)
+const RECEIPT_WIDTH = 32;
+
+// Item line: " 1. ItemName       x1    ₹50.00"
+//   index 3 | space | name (14) | space | qty (3) | space | amount (9) = 32 chars.
+// If an unusually long qty/amount needs more room, the name column shrinks so the
+// line never exceeds 32 characters (the printer would cut the overflow off).
+// qty may be a number (shown as "x2") or a column label such as "QTY".
 function formatReceiptLine(index, name, qty, price) {
-  // Format: "1. ItemName     x1  ₹50.00"
-  // Index: 3 chars ("1. ")
-  // Name: 14 chars max (truncated with ... if needed)
-  // Qty: 2 chars ("x1")
-  // Price: 10 chars (" ₹99999.99") — handles up to ₹99,999.99
-  // Spacing: 3 chars
-  // Total: 32 chars
-  
   const idxStr = index ? String(index).padStart(2) + "." : "   ";
-  
-  // Smart name truncation - if >14 chars, truncate with ".."
-  let nameStr = name;
-  if (name.length > 14) {
-    nameStr = name.substring(0, 12) + "..";
-  }
-  nameStr = nameStr.padEnd(14);
-  
-  const qtyStr = qty ? "x" + String(qty).padStart(1) : "  ";
-  const priceStr = price ? String(price).padStart(10) : "          ";
-  
-  return idxStr + " " + nameStr + " " + qtyStr + " " + priceStr;
+  const qtyStr = (qty === "" || qty === null || qty === undefined) ? "" : (typeof qty === "number" ? "x" + qty : String(qty));
+  const priceStr = price ? String(price) : "";
+  const right = qtyStr.padEnd(3) + " " + priceStr.padStart(9);
+  const nameWidth = Math.max(4, RECEIPT_WIDTH - idxStr.length - 2 - right.length);
+
+  // Smart name truncation - if too long, truncate with ".."
+  let nameStr = String(name ?? "");
+  if (nameStr.length > nameWidth) nameStr = nameStr.substring(0, nameWidth - 2) + "..";
+  return idxStr + " " + nameStr.padEnd(nameWidth) + " " + right;
+}
+
+// Column header that lines up with formatReceiptLine rows.
+function receiptHeaderLine() {
+  return formatReceiptLine("#", "ITEM", "QTY", "AMT");
 }
 
 // Helper to center text in 32 char width
-function centerText(text, width = 32) {
+function centerText(text, width = RECEIPT_WIDTH) {
+  text = String(text ?? "");
   if (text.length >= width) return text.substring(0, width);
   const padding = Math.max(0, width - text.length);
   const leftPad = Math.floor(padding / 2);
@@ -36,19 +38,34 @@ function centerText(text, width = 32) {
 
 // Helper to create a divider line
 function divider(char = '-') {
-  return char.repeat(32);
+  return char.repeat(RECEIPT_WIDTH);
 }
 
 // Format currency with proper spacing
 function formatPrice(amount) {
-  return "₹" + amount.toFixed(2);
+  return "₹" + (Number(amount) || 0).toFixed(2);
 }
 
-function renderBillContent(billData, { isPreview = false } = {}) {
+function _fitLine(text) {
+  return text.length > RECEIPT_WIDTH ? text.substring(0, RECEIPT_WIDTH) : text;
+}
+
+// Puts receipt text into #billContent as plain text (never parsed as HTML, so
+// product names like "Mac & Cheese <Large>" print exactly as typed).
+function setReceiptText(text) {
+  const billContent = document.getElementById("billContent");
+  if (!billContent) return;
+  const pre = document.createElement("pre");
+  pre.className = "receipt-pre";
+  pre.textContent = text;
+  billContent.replaceChildren(pre);
+}
+
+function buildReceiptText(billData, { isPreview = false } = {}) {
   const items = Array.isArray(billData?.items) ? billData.items : [];
   const paymentMode = billData?.paymentMode || "Cash";
-  const orderLabel = billData?.orderId || currentOrderId || "Walk-in";
-  const billNumberLabel = isPreview ? "Prev" + (billData.billNo || "1") : (billData.billNo || "1");
+  const orderLabel = String(billData?.orderId || currentOrderId || "Walk-in");
+  const billNo = String(billData?.billNo || "1");
   let createdAt;
   try {
     const t = billData?.time;
@@ -79,15 +96,12 @@ function renderBillContent(billData, { isPreview = false } = {}) {
     total += itemTotal;
     totalItems += quantity;
 
-    // Main item line - optimized format
-    const itemPrice = formatPrice(itemTotal);
-    itemsText += formatReceiptLine(index + 1, item.name, quantity, itemPrice) + "\n";
+    itemsText += formatReceiptLine(index + 1, item.name, quantity, formatPrice(itemTotal)) + "\n";
 
-    // Add addon lines if any - compact format
+    // Add-on lines - compact format
     if (Array.isArray(item.addons) && item.addons.length > 0) {
       item.addons.forEach(addon => {
-        const addonPrice = formatPrice(addon.price || 0);
-        itemsText += formatReceiptLine("", "+" + addon.name.substring(0, 12), "", addonPrice) + "\n";
+        itemsText += formatReceiptLine("", "+" + String(addon.name || "").substring(0, 12), "", formatPrice(addon.price || 0)) + "\n";
       });
     }
   });
@@ -95,25 +109,24 @@ function renderBillContent(billData, { isPreview = false } = {}) {
   const rawTotal    = total;
   const discountAmt = typeof billData?.discountAmount === "number" ? billData.discountAmount : 0;
   const finalTotal  = typeof billData?.total === "number" ? billData.total : Math.max(0, rawTotal - discountAmt);
-  const billContent = document.getElementById("billContent");
-  if (!billContent) return;
+  const cashReceived = typeof billData?.cashReceived === "number" ? billData.cashReceived : finalTotal;
 
-  // Pull cafe details from appSettings (set by loadSettings on startup).
-  // Falls back to hardcoded defaults only if settings haven't loaded yet.
+  // Cafe details from appSettings (set by loadSettings on startup).
   const cafeName  = (typeof appSettings !== "undefined" && appSettings.cafeName)  || "BLOOM CAFE";
   const cafePhone = (typeof appSettings !== "undefined" && appSettings.cafePhone) || "Ph: 9343761114";
 
-  // Build compact receipt optimized for EC-58
-  const receiptText = [
+  return [
     centerText(cafeName),
     centerText(cafePhone),
     divider(),
     isPreview ? centerText("Preview Receipt") : centerText("Receipt"),
     divider(),
-    "Date: " + dateStr + "  No: " + billNumberLabel,
-    "Time: " + timeStr + "  Tbl: " + orderLabel.substring(0, 8),
+    // Bill number gets its own line: "BC-YYYYMMDD-N" no longer pushes the line past 32 chars.
+    _fitLine("Bill: " + billNo + (isPreview ? " (prev)" : "")),
+    _fitLine("Date: " + dateStr + "  Time: " + timeStr),
+    _fitLine("Table: " + orderLabel),
     divider(),
-    " #. " + "ITEM".padEnd(14) + " " + "QT" + " " + "AMT".padStart(10),
+    receiptHeaderLine(),
     divider(),
     itemsText.trimEnd(),
     divider(),
@@ -127,8 +140,8 @@ function renderBillContent(billData, { isPreview = false } = {}) {
     divider(),
     "Payment: " + paymentMode.substring(0, 10).padStart(22),
     ...(paymentMode === "Cash" ? [
-      "Received: " + formatPrice(billData?.cashReceived ?? finalTotal).padStart(21),
-      "Change:   " + formatPrice(Math.max(0, (billData?.cashReceived ?? finalTotal) - finalTotal)).padStart(21),
+      "Received: " + formatPrice(cashReceived).padStart(21),
+      "Change:   " + formatPrice(Math.max(0, cashReceived - finalTotal)).padStart(21),
     ] : []),
     divider(),
     centerText("Thank You!"),
@@ -136,67 +149,138 @@ function renderBillContent(billData, { isPreview = false } = {}) {
     divider(),
     ""
   ].join("\n");
-
-  // Use pre tag with 9px font for EC-58 printer
-  billContent.innerHTML = `<pre style="font-family: 'Courier New', 'Consolas', monospace; font-size: 9px; line-height: 1.1; margin: 0; padding: 0; white-space: pre; overflow: hidden; width: 56mm; max-width: 56mm;">${receiptText}</pre>`;
 }
 
+function renderBillContent(billData, { isPreview = false } = {}) {
+  setReceiptText(buildReceiptText(billData, { isPreview }));
+}
+
+// ================= CHECKOUT MODAL =================
+
 let isFinalizingBill = false;
-let _activeBillTotal = 0;   // set by openBillPreview, used by discount helpers
+let _activeBillTotal = 0;   // cart subtotal of the bill being previewed
 let _discountAmount  = 0;   // current discount in rupees
+let _previewBill     = null; // { billNo, orderId, time, items } shown in the preview
+
+function _selectedPaymentMode() {
+  return document.querySelector('input[name="paymentMode"]:checked')?.value || "Cash";
+}
+
+function _grandTotal() {
+  return Math.max(0, _activeBillTotal - (_discountAmount || 0));
+}
+
+function _enteredCash() {
+  const el = document.getElementById("cashReceivedInput");
+  const raw = el ? el.value.trim() : "";
+  if (raw === "") return null;
+  const n = parseFloat(raw);
+  return isNaN(n) ? null : n;
+}
+
+// Re-render the paper preview so it always matches what will print.
+function _renderPreview() {
+  if (!_previewBill) return;
+  const mode = _selectedPaymentMode();
+  const cash = mode === "Cash" ? _enteredCash() : null;
+  renderBillContent({
+    ..._previewBill,
+    paymentMode: mode,
+    discountAmount: _discountAmount || 0,
+    ...(cash !== null ? { cashReceived: cash } : {}),
+  }, { isPreview: true });
+}
+
+function _updateBillSummary() {
+  const sub = document.getElementById("billSubtotal");
+  const disc = document.getElementById("discountDisplay");
+  const grand = document.getElementById("billGrandTotal");
+  if (sub) sub.textContent = formatMoney(_activeBillTotal);
+  if (disc) {
+    disc.innerHTML = _discountAmount > 0
+      ? `<span>Discount</span><span class="num">−${formatMoney(_discountAmount)}</span>`
+      : "";
+  }
+  if (grand) grand.textContent = formatMoney(_grandTotal());
+}
+
+function _renderQuickCash() {
+  const box = document.getElementById("quickCash");
+  if (!box) return;
+  const g = _grandTotal();
+  if (_selectedPaymentMode() !== "Cash" || g <= 0) { box.replaceChildren(); return; }
+  const values = [g];
+  [50, 100, 500].forEach(step => values.push(Math.ceil(g / step) * step));
+  [500, 1000, 2000].forEach(note => values.push(note));
+  const unique = [...new Set(values.map(v => Math.round(v * 100) / 100))]
+    .filter(v => v >= g)
+    .sort((a, b) => a - b)
+    .slice(0, 5);
+  box.innerHTML = unique.map((v, i) =>
+    `<button type="button" class="chip" data-cash="${v}">${i === 0 ? "Exact " : ""}${formatMoney(v, "auto")}</button>`
+  ).join("");
+}
 
 async function openBillPreview() {
   try {
     if (!currentOrderId) return;
+    if (isModalOpen("billModal")) return;
     const ordersResponse = await window.electronAPI.getActiveOrders();
     if (!ordersResponse.success) {
       console.error("Failed to get active orders:", ordersResponse.error);
+      showToast("Could not load the order", "error");
       return;
     }
     const activeOrders = ordersResponse.data;
     const cart = activeOrders[currentOrderId] || [];
-
-    if (cart.length === 0) {
-      showToast("Cart is empty!", "warning");
-      return;
-    }
-
-    const billResponse = await window.electronAPI.getNextBillNumber();
-    if (!billResponse.success) {
-      console.error("Failed to get next bill number:", billResponse.error);
-      return;
-    }
 
     if (!Array.isArray(cart)) {
       console.error("Invalid cart data: cart is not an array");
       return;
     }
 
-    // Restore last-used payment mode from localStorage
-    const savedMode = localStorage.getItem("lastPaymentMode") || "Cash";
-    const modeRadio = document.querySelector(`input[name="paymentMode"][value="${savedMode}"]`);
+    if (cart.length === 0) {
+      showToast("Cart is empty! Add items first.", "warning");
+      return;
+    }
+
+    const billResponse = await window.electronAPI.getNextBillNumber();
+    if (!billResponse.success && !billResponse.data) {
+      console.error("Failed to get next bill number:", billResponse.error);
+      showToast("Could not prepare the bill", "error");
+      return;
+    }
+
+    // Restore last-used payment mode
+    let savedMode = "Cash";
+    try { savedMode = localStorage.getItem("lastPaymentMode") || "Cash"; } catch (_) {}
+    const modeRadio = document.querySelector(`input[name="paymentMode"][value="${savedMode}"]`)
+      || document.querySelector('input[name="paymentMode"][value="Cash"]');
     if (modeRadio) modeRadio.checked = true;
 
-    renderBillContent({
+    const { count, total } = cartTotals(cart);
+    _activeBillTotal = total;
+    _previewBill = {
       billNo: billResponse.data,
       orderId: currentOrderId,
       time: new Date().toISOString(),
       items: cart,
-      paymentMode: savedMode
-    }, { isPreview: true });
+    };
 
-    document.getElementById("billModal").style.display = "block";
+    const label = document.getElementById("billOrderLabel");
+    if (label) label.textContent = `${currentOrderId} · ${count} item${count !== 1 ? "s" : ""}`;
 
-    // Capture current cart total for discount calculations
-    const totalEl = document.getElementById("total");
-    _activeBillTotal = totalEl ? (parseFloat(totalEl.innerText) || 0) : 0;
     _resetDiscount();
-
-    // Sync cash received row visibility and attach change listeners
+    const cashInput = document.getElementById("cashReceivedInput");
+    if (cashInput) cashInput.value = "";
     _syncCashReceivedRow();
-    document.querySelectorAll('input[name="paymentMode"]').forEach(radio => {
-      radio.onchange = _syncCashReceivedRow;
-    });
+    _updateBillSummary();
+    updateChangeDisplay();   // also renders the receipt preview
+
+    const finalizeBtn = document.getElementById("finalizeBillBtn");
+    if (finalizeBtn) finalizeBtn.disabled = false;
+
+    openModal("billModal", { focus: _selectedPaymentMode() === "Cash" ? "#cashReceivedInput" : "#finalizeBillBtn" });
   } catch (error) {
     console.error("openBillPreview error:", error);
     showToast("Failed to open bill preview", "error");
@@ -204,21 +288,19 @@ async function openBillPreview() {
 }
 
 function closeBillPreview() {
-  const billModal = document.getElementById("billModal");
-  if (!billModal) return; // DOM safety
-  billModal.style.display = "none";
-  // Reset discount state on close
+  closeModal("billModal");
+  // Reset discount / cash entry (the cart itself stays saved on the table).
   _resetDiscount();
-  // Reset cash received field on close
   const cashInput = document.getElementById("cashReceivedInput");
   if (cashInput) cashInput.value = "";
   const changeDisplay = document.getElementById("changeDisplay");
   if (changeDisplay) { changeDisplay.textContent = ""; changeDisplay.className = "change-display"; }
+  _previewBill = null;
 }
 
 // Show/hide cash received row depending on selected payment mode
 function _syncCashReceivedRow() {
-  const selectedMode = document.querySelector('input[name="paymentMode"]:checked')?.value || "Cash";
+  const selectedMode = _selectedPaymentMode();
   const cashRow = document.getElementById("cashReceivedRow");
   if (cashRow) cashRow.style.display = selectedMode === "Cash" ? "flex" : "none";
   if (selectedMode !== "Cash") {
@@ -227,64 +309,77 @@ function _syncCashReceivedRow() {
     const changeDisplay = document.getElementById("changeDisplay");
     if (changeDisplay) { changeDisplay.textContent = ""; changeDisplay.className = "change-display"; }
   }
+  _renderQuickCash();
 }
 
-// Called by oninput on cashReceivedInput
+function _onPaymentModeChange() {
+  _syncCashReceivedRow();
+  updateChangeDisplay();
+}
+
+// Called by oninput on cashReceivedInput (and whenever the total changes)
 function updateChangeDisplay() {
-  const totalEl = document.getElementById("total");
-  const cashInput = document.getElementById("cashReceivedInput");
   const changeDisplay = document.getElementById("changeDisplay");
-  if (!cashInput || !changeDisplay || !totalEl) return;
+  const received = _selectedPaymentMode() === "Cash" ? _enteredCash() : null;
 
-  const received = parseFloat(cashInput.value);
-  const total = parseFloat(totalEl.innerText) || 0;
-
-  if (isNaN(received) || cashInput.value === "") {
-    changeDisplay.textContent = "";
-    changeDisplay.className = "change-display";
-    return;
+  if (changeDisplay) {
+    if (received === null) {
+      changeDisplay.textContent = "";
+      changeDisplay.className = "change-display";
+    } else {
+      // Change is calculated on the discounted total.
+      const change = received - _grandTotal();
+      if (change >= 0) {
+        changeDisplay.innerHTML = `<span>Change to return</span><span class="num">${formatMoney(change)}</span>`;
+        changeDisplay.className = "change-display";
+      } else {
+        changeDisplay.innerHTML = `<span>Short by</span><span class="num">${formatMoney(Math.abs(change))}</span>`;
+        changeDisplay.className = "change-display insufficient";
+      }
+    }
   }
-
-  const change = received - total;
-  if (change >= 0) {
-    changeDisplay.textContent = "Change: ₹" + change.toFixed(2);
-    changeDisplay.className = "change-display";
-  } else {
-    changeDisplay.textContent = "Short by ₹" + Math.abs(change).toFixed(2);
-    changeDisplay.className = "change-display insufficient";
-  }
+  _renderPreview();
 }
 
 // ---- Discount helpers ----
 
+function _setDiscountActive(key) {
+  document.querySelectorAll(".discount-btn").forEach(b => b.classList.toggle("active", b.dataset.discount === key));
+}
+
 function _resetDiscount() {
   _discountAmount = 0;
-  document.querySelectorAll(".discount-btn").forEach(b => b.classList.remove("active"));
+  _setDiscountActive(null);
   const customRow = document.getElementById("discountCustomRow");
   if (customRow) customRow.style.display = "none";
+  const customInput = document.getElementById("discountCustomInput");
+  if (customInput) customInput.value = "";
   const discountDisplay = document.getElementById("discountDisplay");
   if (discountDisplay) discountDisplay.textContent = "";
+}
+
+function _afterDiscountChange() {
+  _updateBillSummary();
+  _renderQuickCash();
+  updateChangeDisplay();
 }
 
 function applyDiscount(type) {
   if (type === "0") {
     _resetDiscount();
-    // Mark "None" as active
-    document.querySelectorAll(".discount-btn").forEach(b => {
-      b.classList.toggle("active", b.textContent.trim() === "None");
-    });
+    _setDiscountActive("0");
+    _afterDiscountChange();
     return;
   }
 
   if (type === "custom") {
     _discountAmount = 0;
-    document.querySelectorAll(".discount-btn").forEach(b => b.classList.remove("active"));
-    const btn = Array.from(document.querySelectorAll(".discount-btn")).find(b => b.textContent.trim() === "Custom");
-    if (btn) btn.classList.add("active");
+    _setDiscountActive("custom");
     const customRow = document.getElementById("discountCustomRow");
-    if (customRow) { customRow.style.display = "block"; }
+    if (customRow) customRow.style.display = "flex";
     const customInput = document.getElementById("discountCustomInput");
     if (customInput) { customInput.value = ""; customInput.focus(); }
+    _afterDiscountChange();
     return;
   }
 
@@ -292,19 +387,10 @@ function applyDiscount(type) {
   if (isNaN(pct)) return;
 
   _discountAmount = Math.round(_activeBillTotal * pct / 100);
-
-  document.querySelectorAll(".discount-btn").forEach(b => {
-    b.classList.toggle("active", b.textContent.trim() === pct + "%");
-  });
+  _setDiscountActive(String(pct));
   const customRow = document.getElementById("discountCustomRow");
   if (customRow) customRow.style.display = "none";
-
-  const discountDisplay = document.getElementById("discountDisplay");
-  if (discountDisplay) {
-    discountDisplay.textContent = _discountAmount > 0
-      ? `Discount: -₹${_discountAmount.toFixed(2)} | Final: ₹${Math.max(0, _activeBillTotal - _discountAmount).toFixed(2)}`
-      : "";
-  }
+  _afterDiscountChange();
 }
 
 function applyCustomDiscount() {
@@ -312,24 +398,19 @@ function applyCustomDiscount() {
   if (!customInput) return;
   const val = parseFloat(customInput.value);
   _discountAmount = (!isNaN(val) && val >= 0) ? Math.min(val, _activeBillTotal) : 0;
-  const discountDisplay = document.getElementById("discountDisplay");
-  if (discountDisplay) {
-    discountDisplay.textContent = _discountAmount > 0
-      ? `Discount: -₹${_discountAmount.toFixed(2)} | Final: ₹${Math.max(0, _activeBillTotal - _discountAmount).toFixed(2)}`
-      : "";
-  }
+  _afterDiscountChange();
 }
 
 // ---- end discount helpers ----
 
 async function finalizeBill() {
   if (isFinalizingBill) {
-    showToast("Bill is being processed, please wait...", "error");
+    showToast("Bill is being processed, please wait...", "warning");
     return;
   }
   isFinalizingBill = true;
-  
-  const finalizeBtn = document.querySelector('#billModal .primary-btn');
+
+  const finalizeBtn = document.getElementById("finalizeBillBtn");
   if (finalizeBtn) finalizeBtn.disabled = true;
 
   try {
@@ -337,34 +418,27 @@ async function finalizeBill() {
       showToast("No order selected", "error");
       return;
     }
-    
+
     const paymentModeRadio = document.querySelector('input[name="paymentMode"]:checked');
     if (!paymentModeRadio) {
       showToast("Please select a payment mode", "warning");
-      if (finalizeBtn) finalizeBtn.disabled = false;
       return;
     }
-    
+
     const paymentMode = paymentModeRadio.value;
 
     // Remember this payment mode for next bill
     try { localStorage.setItem("lastPaymentMode", paymentMode); } catch (_) {}
 
-    // Read cash received input (only relevant for Cash)
-    const cashInputEl = document.getElementById("cashReceivedInput");
-    const cashEnteredStr = cashInputEl ? cashInputEl.value.trim() : "";
-    const cashReceived = cashEnteredStr !== "" ? parseFloat(cashEnteredStr) : null;
+    // Cash received (only relevant for Cash)
+    const cashReceived = paymentMode === "Cash" ? _enteredCash() : null;
 
     // Short-payment guard: block finalization when entered cash < total
-    if (paymentMode === "Cash" && cashReceived !== null && !isNaN(cashReceived)) {
-      const discountedTotal = Math.max(0, _activeBillTotal - (_discountAmount || 0));
+    if (cashReceived !== null) {
+      const discountedTotal = _grandTotal();
       if (cashReceived < discountedTotal) {
-        showToast(
-          `Cash ₹${cashReceived.toFixed(2)} is less than total ₹${discountedTotal.toFixed(2)}`,
-          "error"
-        );
-        if (finalizeBtn) finalizeBtn.disabled = false;
-        isFinalizingBill = false;
+        showToast(`Cash ${formatMoney(cashReceived)} is less than total ${formatMoney(discountedTotal)}`, "error");
+        document.getElementById("cashReceivedInput")?.focus();
         return;
       }
     }
@@ -373,81 +447,40 @@ async function finalizeBill() {
       orderId:        currentOrderId,
       paymentMode:    paymentMode,
       discountAmount: _discountAmount || 0,
-      cashReceived:   (paymentMode === "Cash" && cashReceived !== null && !isNaN(cashReceived))
-                        ? cashReceived
-                        : null,
+      cashReceived:   cashReceived,
     });
-    
+
     if (!result || !result.success) {
       showToast(result?.error || "Bill finalization failed", "error");
-      if (finalizeBtn) finalizeBtn.disabled = false;
       return;
     }
-    
+
     const finalBill = result.data;
-    if (finalBill && finalBill.billNo) {
-      renderBillContent(finalBill);
-      showToast(`Bill #${finalBill.billNo} finalized successfully!`);
-      if (Array.isArray(finalBill.stockWarnings) && finalBill.stockWarnings.length) {
-        const names = finalBill.stockWarnings.map(w => `${w.name} (short ${w.short})`).join(", ");
-        setTimeout(() => showToast(`Stock count too low for: ${names}. Please update inventory.`, "warning"), 1500);
-      }
+    if (!finalBill || !finalBill.billNo) throw new Error("Invalid bill data received");
 
-      const autoPrint = localStorage.getItem("autoPrintAfterFinalize") === "true";
+    renderBillContent(finalBill);
+    showToast(`Bill #${finalBill.billNo} finalized`);
+    if (Array.isArray(finalBill.stockWarnings) && finalBill.stockWarnings.length) {
+      const names = finalBill.stockWarnings.map(w => `${w.name} (short ${w.short})`).join(", ");
+      setTimeout(() => showToast(`Stock count too low for: ${names}. Please update inventory.`, "warning"), 1500);
+    }
 
-      if (autoPrint) {
-        // Auto-print: skip confirmation dialog, print immediately
-        closeBillPreview();
-        currentOrderId = null;
-        await updateTableStatus();
-        await printBill(finalBill.billNo);
-        showTableView();
-      } else {
-        // Show print confirmation dialog
-        const printModalId = "printConfirmModal";
-        let existingModal = document.getElementById(printModalId);
-        if (existingModal) existingModal.remove();
+    let autoPrint = false;
+    try { autoPrint = localStorage.getItem("autoPrintAfterFinalize") === "true"; } catch (_) {}
 
-        const printModal = document.createElement("div");
-        printModal.id = printModalId;
-        printModal.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:99999;display:flex;align-items:center;justify-content:center;";
-        printModal.innerHTML = `
-          <div style="background:white;padding:30px;border-radius:16px;text-align:center;min-width:320px;box-shadow:0 8px 32px rgba(0,0,0,0.3);">
-            <h3 style="margin-bottom:10px;color:#3C2A21;">✅ Bill Finalized!</h3>
-            <p style="color:#666;margin-bottom:8px;">Bill #${escapeHTML(finalBill.billNo)}</p>
-            <p style="color:#E86A33;font-size:20px;font-weight:bold;margin-bottom:20px;">₹${(finalBill.total || 0).toFixed(2)}</p>
-            <p style="color:#888;font-size:13px;margin-bottom:20px;">Payment: ${escapeHTML(paymentMode)}</p>
-            <div style="display:flex;gap:12px;justify-content:center;">
-              <button id="printReceiptBtn" style="padding:14px 28px;background:#4CAF50;color:white;border:none;border-radius:8px;cursor:pointer;font-size:15px;font-weight:600;">🖨️ Print Receipt</button>
-              <button id="skipPrintBtn" style="padding:14px 28px;background:#e0d5c5;color:#333;border:none;border-radius:8px;cursor:pointer;font-size:15px;font-weight:600;">Skip</button>
-            </div>
-          </div>
-        `;
-        document.body.appendChild(printModal);
+    closeBillPreview();
+    currentOrderId = null;
+    await updateTableStatus();
 
-        document.getElementById("printReceiptBtn").onclick = async function() {
-          const modalEl = document.getElementById(printModalId);
-          if (modalEl) modalEl.remove();
-          await printBill(finalBill.billNo);
-          showTableView();
-        };
-
-        document.getElementById("skipPrintBtn").onclick = function() {
-          const modalEl = document.getElementById(printModalId);
-          if (modalEl) modalEl.remove();
-          showTableView();
-        };
-
-        closeBillPreview();
-        currentOrderId = null;
-        await updateTableStatus();
-      }
+    if (autoPrint) {
+      // Auto-print: skip confirmation dialog, print immediately
+      await printBill(finalBill.billNo);
+      showTableView();
     } else {
-      throw new Error("Invalid bill data received");
+      _showPrintConfirm(finalBill);
     }
   } catch (error) {
     console.error("finalizeBill error:", error);
-    if (finalizeBtn) finalizeBtn.disabled = false;
     showToast("Failed to finalize bill. Please try again.", "error");
   } finally {
     isFinalizingBill = false;
@@ -455,14 +488,45 @@ async function finalizeBill() {
   }
 }
 
+function _showPrintConfirm(finalBill) {
+  const meta = document.getElementById("printConfirmMeta");
+  const totalEl = document.getElementById("printConfirmTotal");
+  const changeEl = document.getElementById("printConfirmChange");
+  const printBtn = document.getElementById("printReceiptBtn");
+  const skipBtn = document.getElementById("skipPrintBtn");
+  if (!printBtn || !skipBtn) { showTableView(); return; }
+
+  if (meta) meta.textContent = `Bill #${finalBill.billNo} · ${finalBill.paymentMode || "Cash"}`;
+  if (totalEl) totalEl.textContent = formatMoney(finalBill.total || 0);
+  if (changeEl) {
+    const change = typeof finalBill.cashReceived === "number" ? finalBill.cashReceived - (finalBill.total || 0) : 0;
+    changeEl.textContent = change > 0 ? `Change to return: ${formatMoney(change)}` : "";
+  }
+
+  const done = () => { closeModal("printConfirmModal"); showTableView(); };
+  registerModal("printConfirmModal", done);   // Esc = Skip
+
+  printBtn.disabled = false;
+  printBtn.onclick = async () => {
+    if (printBtn.disabled) return;
+    printBtn.disabled = true;
+    closeModal("printConfirmModal");
+    await printBill(finalBill.billNo);
+    showTableView();
+  };
+  skipBtn.onclick = done;
+
+  openModal("printConfirmModal", { focus: "#printReceiptBtn" });
+}
+
 async function printBill(billNo) {
   const billContent = document.getElementById("billContent");
   const billModal = document.getElementById("billModal");
-  if (!billContent) { showToast("Nothing to print", "error"); return; }
+  if (!billContent || !billContent.textContent.trim()) { showToast("Nothing to print", "error"); return; }
   // Restore the modal to how we found it, so printing after finalize does not
   // leave a stale bill preview covering the table view.
-  const modalWasVisible = billModal && billModal.style.display === "block";
-  if (billModal) billModal.style.display = "block";
+  const modalWasVisible = isModalOpen(billModal);
+  if (billModal && !modalWasVisible) billModal.style.display = "flex";
   billContent.style.display = "block";
   // Small delay so the DOM fully renders before Chromium captures the print view
   await new Promise(resolve => setTimeout(resolve, 200));
@@ -488,9 +552,9 @@ async function printBill(billNo) {
 }
 
 async function deleteBill(billNo) {
-  showConfirmModal("Are you sure you want to delete this bill?", async () => {
+  showConfirmModal(`Delete bill #${billNo}? Stock sold on this bill will be restored.`, async () => {
     try {
-      const result = await window.electronAPI.deleteBill( billNo);
+      const result = await window.electronAPI.deleteBill(billNo);
       const success = typeof result === "boolean" ? result : !!result?.success;
       if (success) {
         showToast("Bill deleted.");
@@ -498,8 +562,7 @@ async function deleteBill(billNo) {
         showToast(result?.error || "Failed to delete bill.", "error");
       }
       const datePicker = document.getElementById("dashDatePicker");
-      const _nd = new Date();
-      const selectedDate = datePicker?.value || `${_nd.getFullYear()}-${String(_nd.getMonth()+1).padStart(2,"0")}-${String(_nd.getDate()).padStart(2,"0")}`;
+      const selectedDate = datePicker?.value || todayStr();
       await loadDashboardForDate(selectedDate);
       await loadWeeklyChart();
       await loadCategories();
@@ -507,5 +570,25 @@ async function deleteBill(billNo) {
       console.error("deleteBill error:", error);
       showToast("Failed to delete bill.", "error");
     }
+  }, { confirmLabel: "Delete Bill", title: "Delete this bill?" });
+}
+
+// ---- one-time wiring ----
+document.querySelectorAll('input[name="paymentMode"]').forEach(radio => {
+  radio.addEventListener("change", _onPaymentModeChange);
+});
+
+const _quickCashBox = document.getElementById("quickCash");
+if (_quickCashBox) {
+  _quickCashBox.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-cash]");
+    if (!btn) return;
+    const input = document.getElementById("cashReceivedInput");
+    if (!input) return;
+    input.value = btn.dataset.cash;
+    updateChangeDisplay();
+    document.getElementById("finalizeBillBtn")?.focus();
   });
 }
+
+registerModal("billModal", closeBillPreview);

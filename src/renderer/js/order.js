@@ -1,16 +1,32 @@
 // ================= TABLE & ORDER MANAGEMENT =================
 
-async function loadInitialData() {
-  try {
-    document.getElementById("welcome-screen").style.display = "none";
-    document.getElementById("pos-app").style.display = "block";
-    await loadCategories();
-    await loadSettings();
-    showTableView(); // Show the new table view first
-  } catch (error) {
-    console.error("enter POS error:", error);
-    showToast("Failed to start POS", "error");
-  }
+const SPECIAL_ORDERS = [
+  { id: "Delivery", icon: "truck" },
+  { id: "Direct Bill", icon: "receipt" },
+];
+
+function _buildTableTile(orderId, { special = null } = {}) {
+  const tile = document.createElement("button");
+  tile.type = "button";
+  tile.className = "table-item" + (special ? " table-item--special" : "");
+  tile.id = `order-${orderId}`;
+  tile.dataset.orderId = orderId;
+
+  const kind = special ? "Order" : "Table";
+  const label = special ? `${icon(special.icon)}<span>${escapeHTML(orderId)}</span>` : escapeHTML(orderId.replace(/^Table\s+/, ""));
+  tile.innerHTML = `
+    <span class="table-top">
+      <span class="table-kind">${kind}</span>
+      <span class="table-status">Free</span>
+    </span>
+    <span class="table-num">${label}</span>
+    <span class="table-foot">
+      <span class="table-meta">Tap to start</span>
+      <span class="table-total num"></span>
+    </span>`;
+  tile.setAttribute("aria-label", `${orderId}, free`);
+  tile.onclick = () => selectOrder(orderId);
+  return tile;
 }
 
 function renderTableGrid(numberOfTables = 6) {
@@ -18,39 +34,21 @@ function renderTableGrid(numberOfTables = 6) {
   if (!tableGrid) return;
 
   const safeTableCount = Number.isInteger(numberOfTables) && numberOfTables > 0 ? numberOfTables : 6;
-  tableGrid.innerHTML = "";
-
+  const frag = document.createDocumentFragment();
   for (let tableNumber = 1; tableNumber <= safeTableCount; tableNumber++) {
-    const orderId = `Table ${tableNumber}`;
-    const tableEl = document.createElement("div");
-    tableEl.className = "table-item";
-    tableEl.id = `order-${orderId}`;
-    tableEl.innerText = orderId;
-    tableEl.onclick = () => selectOrder(orderId);
-    tableGrid.appendChild(tableEl);
+    frag.appendChild(_buildTableTile(`Table ${tableNumber}`));
   }
-
-  const deliveryEl = document.createElement("div");
-  deliveryEl.className = "table-item delivery";
-  deliveryEl.id = "order-Delivery";
-  deliveryEl.innerText = "Delivery";
-  deliveryEl.onclick = () => selectOrder("Delivery");
-  tableGrid.appendChild(deliveryEl);
-
-  const directBillEl = document.createElement("div");
-  directBillEl.className = "table-item delivery";
-  directBillEl.id = "order-Direct Bill";
-  directBillEl.innerText = "Direct Bill";
-  directBillEl.onclick = () => selectOrder("Direct Bill");
-  tableGrid.appendChild(directBillEl);
+  SPECIAL_ORDERS.forEach(s => frag.appendChild(_buildTableTile(s.id, { special: s })));
+  tableGrid.replaceChildren(frag);
+  updateTableStatus();
 }
 
 function showTableView() {
   const tableView = document.getElementById("tableView");
   const orderView = document.getElementById("orderView");
-  
+
   if (!tableView || !orderView) return; // DOM safety
-  
+
   tableView.style.display = "block";
   orderView.style.display = "none";
   currentOrderId = null;
@@ -64,17 +62,19 @@ function showTableView() {
 
 function selectOrder(orderId) {
   currentOrderId = orderId;
-  
+
   const tableView = document.getElementById("tableView");
   const orderView = document.getElementById("orderView");
   const currentOrderTitle = document.getElementById("currentOrderTitle");
-  
-  if (!tableView || !orderView || !currentOrderTitle) return; // DOM safety
-  
-  tableView.style.display = "none";
-  orderView.style.display = "block";
-  currentOrderTitle.innerText = `Now Serving: ${orderId}`;
 
+  if (!tableView || !orderView || !currentOrderTitle) return; // DOM safety
+
+  tableView.style.display = "none";
+  orderView.style.display = "flex";
+  currentOrderTitle.textContent = orderId;
+
+  // Re-show the selected category's products (clears any leftover search).
+  if (typeof searchProducts === "function") searchProducts("");
   renderCart();
 
   // Auto-focus product search so staff can type immediately
@@ -82,34 +82,38 @@ function selectOrder(orderId) {
   if (searchInput) setTimeout(() => searchInput.focus(), 50);
 }
 
-// Internal: update table status DOM from pre-fetched activeOrders data.
+// Internal: update table tiles from pre-fetched activeOrders data.
 // Called by refreshCartView() in cart.js to avoid a second getActiveOrders round-trip.
 function _updateTableStatusFromData(activeOrders) {
-  const tableItems = document.querySelectorAll(".table-item");
-  if (!tableItems) return;
+  const orders = activeOrders || {};
+  let openCount = 0;
+  let openTotal = 0;
 
-  tableItems.forEach(table => {
-    table.classList.remove("in-use");
-    const existing = table.querySelector(".table-badge");
-    if (existing) existing.remove();
+  document.querySelectorAll("#tableGrid .table-item").forEach(tile => {
+    const orderId = tile.dataset.orderId;
+    const items = Array.isArray(orders[orderId]) ? orders[orderId] : [];
+    const { count, total } = cartTotals(items);
+    const busy = count > 0;
+
+    tile.classList.toggle("in-use", busy);
+    const status = tile.querySelector(".table-status");
+    const meta = tile.querySelector(".table-meta");
+    const totalEl = tile.querySelector(".table-total");
+    if (status) status.textContent = busy ? "Occupied" : "Free";
+    if (meta) meta.textContent = busy ? `${count} item${count !== 1 ? "s" : ""}` : "Tap to start";
+    if (totalEl) totalEl.textContent = busy ? formatMoney(total) : "";
+    tile.setAttribute("aria-label", busy
+      ? `${orderId}, occupied, ${count} items, ${formatMoney(total)}`
+      : `${orderId}, free`);
+
+    if (busy) { openCount++; openTotal += total; }
   });
 
-  for (const orderId in activeOrders) {
-    const tableElement = document.getElementById(`order-${orderId}`);
-
-    if (tableElement && activeOrders[orderId]) {
-      tableElement.classList.add("in-use");
-
-      // Show item count badge
-      const items = Array.isArray(activeOrders[orderId]) ? activeOrders[orderId] : [];
-      const itemCount = items.reduce((sum, item) => sum + (item.quantity || 1), 0);
-      if (itemCount > 0) {
-        const badge = document.createElement("span");
-        badge.className = "table-badge";
-        badge.textContent = itemCount;
-        tableElement.appendChild(badge);
-      }
-    }
+  const summary = document.getElementById("tableSummary");
+  if (summary) {
+    summary.textContent = openCount === 0
+      ? "All tables are free"
+      : `${openCount} open order${openCount !== 1 ? "s" : ""} · ${formatMoney(openTotal)} running`;
   }
 }
 

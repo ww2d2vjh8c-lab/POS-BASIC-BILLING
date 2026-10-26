@@ -1,0 +1,165 @@
+/* =====================================================================
+   BLOOM CAFE POS — DESIGN TOKENS
+   Single source of truth for colour, type, spacing, radius and depth.
+   Everything else references these custom properties.
+   Contrast notes (WCAG AA): white text on --color-primary ≈ 5.3:1,
+   --color-text-subtle on white ≈ 5.5:1, --color-text-muted ≈ 8.9:1.
+   ===================================================================== */
+
+:root {
+  /* ---- Raw palette: warm café ---- */
+  --brand-50:  #FDF4EE;
+  --brand-100: #FAE3D5;
+  --brand-200: #F2C3A6;
+  --brand-400: #DE7E4C;
+  --brand-600: #B5491B;   /* terracotta — primary actions */
+  --brand-700: #9A3C15;
+  --brand-800: #7C3011;
+
+  --espresso-950: #1F140D;
+  --espresso-900: #2A1B12;
+  --espresso-800: #3B2618;
+  --espresso-700: #553828;
+
+  --cream-0:   #FFFFFF;
+  --cream-50:  #FBF8F4;
+  --cream-100: #F6F0E8;
+  --cream-200: #EEE5DA;
+  --cream-300: #E2D5C5;
+  --cream-400: #CBB8A2;
+
+  --ink-900: #2A1B12;
+  --ink-700: #5A4636;
+  --ink-500: #7A6554;
+
+  /* ---- Semantic colours ---- */
+  --color-bg:              var(--cream-50);
+  --color-surface:         var(--cream-0);
+  --color-surface-muted:   var(--cream-100);
+  --color-surface-sunken:  var(--cream-200);
+  --color-border:          var(--cream-300);
+  --color-border-strong:   var(--cream-400);
+
+  --color-text:            var(--ink-900);
+  --color-text-muted:      var(--ink-700);
+  --color-text-subtle:     var(--ink-500);
+  --color-text-inverse:    #FFFFFF;
+
+  --color-primary:         var(--brand-600);
+  --color-primary-hover:   var(--brand-700);
+  --color-primary-active:  var(--brand-800);
+  --color-primary-soft:    var(--brand-50);
+  --color-primary-soft-2:  var(--brand-100);
+  --color-primary-border:  var(--brand-200);
+  --color-on-primary:      #FFFFFF;
+
+  --color-dark:            var(--espresso-800);
+  --color-dark-hover:      var(--espresso-900);
+
+  --color-success:         #2E7D4F;
+  --color-success-hover:   #246640;
+  --color-success-soft:    #E7F4EC;
+  --color-success-text:    #1F6640;
+
+  --color-warning:         #B25E09;
+  --color-warning-soft:    #FDF1DF;
+  --color-warning-text:    #8A4A06;
+
+  --color-danger:          #B42318;
+  --color-danger-hover:    #912018;
+  --color-danger-soft:     #FDECEA;
+  --color-danger-border:   #F4C3BE;
+  --color-danger-text:     #A21F15;
+
+  --color-info:            #1F5FA6;
+  --color-info-soft:       #E8F0FA;
+  --color-info-text:       #194E89;
+
+  --color-overlay:         rgba(31, 20, 13, 0.55);
+  --color-focus:           #B5491B;
+
+  /* Payment modes (dashboard) */
+  --color-pay-cash:        #2E7D4F;
+  --color-pay-upi:         #1F5FA6;
+  --color-pay-card:        #7A4AA8;
+
+  /* ---- Typography ---- */
+  --font-sans: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Roboto, Arial,
+               "Noto Sans", sans-serif, "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji";
+  --font-mono: "Courier New", Consolas, "Cascadia Mono", monospace;
+
+  --text-2xs: 11px;
+  --text-xs:  12px;
+  --text-sm:  13px;
+  --text-base: 15px;
+  --text-md:  16px;
+  --text-lg:  18px;
+  --text-xl:  20px;
+  --text-2xl: 24px;
+  --text-3xl: 30px;
+  --text-4xl: 40px;
+
+  --weight-regular: 400;
+  --weight-medium:  500;
+  --weight-semibold: 600;
+  --weight-bold:    700;
+
+  --leading-tight: 1.2;
+  --leading-normal: 1.45;
+
+  /* ---- Spacing (4px grid) ---- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+
+  /* ---- Radius ---- */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+  --radius-pill: 999px;
+
+  /* ---- Elevation (warm-tinted) ---- */
+  --shadow-xs: 0 1px 2px rgba(42, 27, 18, 0.06);
+  --shadow-sm: 0 1px 3px rgba(42, 27, 18, 0.08), 0 1px 2px rgba(42, 27, 18, 0.04);
+  --shadow-md: 0 4px 12px rgba(42, 27, 18, 0.08), 0 2px 4px rgba(42, 27, 18, 0.04);
+  --shadow-lg: 0 18px 44px rgba(31, 20, 13, 0.22), 0 4px 12px rgba(31, 20, 13, 0.08);
+  --shadow-focus: 0 0 0 3px rgba(181, 73, 27, 0.28);
+
+  /* ---- Control sizes (touch-friendly: >= 44px) ---- */
+  --control-sm: 36px;
+  --control-md: 44px;
+  --control-lg: 52px;
+  --control-xl: 60px;
+
+  /* ---- Layout ---- */
+  --header-h: 60px;
+  --orderbar-h: 60px;
+  --sidebar-w: 200px;
+  --cart-w: 368px;
+
+  /* ---- Motion (kept short; disabled for reduced motion) ---- */
+  --ease: 140ms ease;
+
+  /* ---- Stacking ---- */
+  --z-header: 10;
+  --z-dropdown: 50;
+  --z-modal: 1000;
+  --z-toast: 5000;
+}
+
+@media (max-width: 1180px) {
+  :root {
+    --sidebar-w: 168px;
+    --cart-w: 316px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --ease: 0ms linear; }
+}

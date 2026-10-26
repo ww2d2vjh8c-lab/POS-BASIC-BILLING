@@ -1,179 +1,354 @@
-/* ==============================
-   HEADER
-   ============================== */
-header {
-  background: #FDFBF6;
-  padding: 15px 30px;
-  border-bottom: 2px solid #EAE0D5; /* Light beige border */
-}
+/* =====================================================================
+   LAYOUT — welcome screen, app shell, table grid, order view columns.
+   ===================================================================== */
 
-.header-content {
+/* ---------------- Welcome ---------------- */
+.welcome-screen {
+  height: 100vh;
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  max-width: 1600px;
-  margin: 0 auto;
+  justify-content: center;
+  padding: var(--space-6);
+  background:
+    radial-gradient(1200px 600px at 15% 10%, var(--brand-50), transparent 60%),
+    radial-gradient(900px 500px at 90% 90%, var(--cream-200), transparent 60%),
+    var(--color-bg);
 }
 
-header h1 {
-  font-size: 24px;
-  color: #3C2A21;
-}
-
-.header-buttons {
-  display: flex;
-  gap: 10px;
-}
-
-.header-buttons button {
-  padding: 8px 16px;
-  font-size: 14px;
-  background: #F5EFE6;
-  border-color: #EAE0D5;
-  color: #3C2A21;
-}
-
-.header-buttons button:hover {
-  background: #E86A33;
-  border-color: #E86A33;
-  color: #fff;
-}
-
-/* ==============================
-/* ==============================
-   MAIN CONTAINER
-   ============================== */
-.container {
-  display: flex;
-  height: calc(100vh - 74px);
-  max-width: 1600px;
-  margin: 0 auto;
-}
-
-/* ==============================
-/* ==============================
-   TABLE & ORDER VIEW
-   ============================== */
-#tableView {
+.welcome-card {
   width: 100%;
-  padding: 40px;
+  max-width: 420px;
+  padding: var(--space-10) var(--space-8);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-md);
+  text-align: center;
   display: flex;
   flex-direction: column;
   align-items: center;
 }
 
-#tableView h2 {
-  font-size: 24px;
-  margin-bottom: 30px;
+.welcome-logo {
+  width: 72px;
+  height: 72px;
+  margin-bottom: var(--space-4);
+}
+
+.welcome-title {
+  font-size: var(--text-4xl);
+  letter-spacing: -0.02em;
+}
+
+.welcome-sub {
+  margin-top: var(--space-1);
+  font-size: var(--text-lg);
+  color: var(--color-text-muted);
+}
+
+.welcome-owner {
+  margin-top: var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--color-text-subtle);
+}
+
+.welcome-enter {
+  width: 100%;
+  margin-top: var(--space-8);
+}
+
+.welcome-version {
+  margin-top: var(--space-4);
+  min-height: 1em;
+  font-size: var(--text-xs);
+  color: var(--color-text-subtle);
+}
+
+/* ---------------- App shell ---------------- */
+.pos-app {
+  height: 100vh;
+  flex-direction: column;
+}
+
+.app-header {
+  position: relative;
+  z-index: var(--z-header);
+  flex-shrink: 0;
+  height: var(--header-h);
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: 0 var(--space-5);
+  background: var(--color-dark);
+  color: #fff;
+  box-shadow: var(--shadow-sm);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-right: auto;
+  min-width: 0;
+}
+
+.brand-logo {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+}
+
+.brand-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+  min-width: 0;
+}
+
+.brand-name {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.brand-sub {
+  font-size: var(--text-2xs);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.app-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.nav-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--control-md);
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-md);
+  color: rgba(255, 255, 255, 0.88);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  transition: background-color var(--ease), color var(--ease);
+}
+
+.nav-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.nav-btn:active {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.nav-btn:focus-visible {
+  outline-color: #F2C3A6;
+}
+
+.header-clock {
+  min-width: 128px;
+  padding-left: var(--space-4);
+  border-left: 1px solid rgba(255, 255, 255, 0.16);
+  text-align: right;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+}
+
+.header-clock .clock-time {
+  display: block;
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+}
+
+.header-clock .clock-date {
+  display: block;
+  font-size: var(--text-2xs);
+  color: rgba(255, 255, 255, 0.72);
+}
+
+@media (max-width: 1100px) {
+  .header-clock { display: none; }
+}
+
+/* ---------------- Table view ---------------- */
+.table-view {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-6) var(--space-8) var(--space-8);
+}
+
+/* Tall enough that two stacked toasts end above the first row of tiles. */
+.view-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-4);
+  max-width: 1280px;
+  min-height: 72px;
+  margin: 0 auto var(--space-6);
+}
+
+.view-title {
+  font-size: var(--text-2xl);
+}
+
+.view-sub {
+  margin-top: var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.legend {
+  display: flex;
+  gap: var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.legend-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-surface);
+}
+
+.legend-busy {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
 }
 
 .table-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 25px;
-  width: 100%;
-  max-width: 1000px;
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  gap: var(--space-4);
+  max-width: 1280px;
+  margin: 0 auto;
 }
 
-.table-item {
-  background: #fff;
-  border: 2px solid #EAE0D5;
-  border-radius: 12px;
-  aspect-ratio: 1 / 1;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  font-size: 24px;
-  font-weight: bold;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.05);
-}
-
-.table-item:hover {
-  transform: translateY(-5px);
-  border-color: #E86A33;
-  color: #E86A33;
-  box-shadow: 0 8px 20px rgba(0,0,0,0.08);
-}
-
-.table-item.delivery {
-  background: #3C2A21;
-  color: #fff;
-  border-color: #3C2A21;
-}
-
-.table-item.delivery:hover {
-  background: #2a1e17;
-  color: #fff;
-}
-
-.table-item.in-use {
-  background: #E86A33;
-  color: #fff;
-  border-color: #E86A33;
-}
-
-.table-item.in-use:hover {
-  background: #d15f2a;
-}
-
-/* Item-count badge on active table tiles */
-.table-item {
-  position: relative;
-}
-
-.table-badge {
-  position: absolute;
-  top: 6px;
-  right: 8px;
-  background: #fff;
-  color: #E86A33;
-  font-size: 11px;
-  font-weight: 700;
-  line-height: 1;
-  padding: 2px 5px;
-  border-radius: 9px;
-  border: 1px solid #E86A33;
-  pointer-events: none;
-}
-
-#orderView {
-  width: 100%;
-  display: none; /* Initially hidden */
+/* ---------------- Order view ---------------- */
+.order-view {
+  flex: 1 1 auto;
+  min-height: 0;
   flex-direction: column;
 }
 
-.order-header {
+.order-bar {
+  flex-shrink: 0;
+  height: var(--orderbar-h);
   display: flex;
   align-items: center;
-  padding: 10px 20px;
-  background: #F5EFE6;
-  border-bottom: 1px solid #EAE0D5;
+  gap: var(--space-4);
+  padding: 0 var(--space-5);
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
 }
 
-.order-header h2 {
-  margin: 0;
-  margin-left: 20px;
-  font-size: 18px;
+.order-bar-title {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+  min-width: 0;
 }
 
-.back-button {
-  padding: 8px 12px;
-  font-size: 16px;
+.eyebrow {
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--color-text-subtle);
 }
 
+.order-bar-title h2 {
+  font-size: var(--text-xl);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
-@media (max-width: 900px) {
-  .container {
-    flex-direction: column;
-    height: auto;
-  }
-  .left-panel, .center-panel, .right-panel {
-    width: 100%;
-    height: auto;
-    border-right: none;
-    border-left: none;
-    border-bottom: 1px solid #EAE0D5;
-  }
+.shortcut-hints {
+  margin-left: auto;
+  display: flex;
+  gap: var(--space-4);
+  font-size: var(--text-xs);
+  color: var(--color-text-subtle);
+  white-space: nowrap;
+}
+
+.shortcut-hints kbd {
+  margin: 0 4px 0 0;
+}
+
+@media (max-width: 1100px) {
+  .shortcut-hints { display: none; }
+}
+
+.order-layout {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: var(--sidebar-w) minmax(0, 1fr) var(--cart-w);
+}
+
+.category-panel {
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-4) var(--space-3);
+  background: var(--color-surface-muted);
+  border-right: 1px solid var(--color-border);
+}
+
+.panel-label {
+  padding: 0 var(--space-2) var(--space-2);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--color-text-subtle);
+}
+
+.product-panel {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-4) var(--space-5) 0;
+}
+
+.panel-heading {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: var(--space-4) 0 var(--space-3);
+}
+
+.panel-heading h3 {
+  font-size: var(--text-lg);
+}
+
+.panel-count {
+  font-size: var(--text-sm);
+  color: var(--color-text-subtle);
+}
+
+.cart-panel {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface);
+  border-left: 1px solid var(--color-border);
 }

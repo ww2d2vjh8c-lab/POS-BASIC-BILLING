@@ -158,11 +158,12 @@ npm test
 ### Build Windows installer
 
 ```bash
-npm run build
-# Output: dist/BloomCafePOS-Setup.exe
+npm run dist:win
+# Output: dist/Bloom-Cafe-POS-Setup-<version>.exe
 ```
 
-Or let GitHub Actions build it automatically — every push to `main` produces a release artifact.
+Or let GitHub Actions build it — every push and pull request produces the installer as an artifact,
+and every `v*` tag publishes it as a GitHub Release. Details: [docs/WINDOWS_INSTALLER_BUILD.md](docs/WINDOWS_INSTALLER_BUILD.md).
 
 ---
 
@@ -187,23 +188,59 @@ The `.exe` installer is available as a GitHub Actions artifact on every successf
 ### One-click install from GitHub (client laptop)
 
 1. Install **Git for Windows** (https://git-scm.com) if it is not already there.
-2. Open Command Prompt and run:
+2. Open **Command Prompt** (normal, not "as administrator") and run:
    ```
+   cd %USERPROFILE%
    git clone https://github.com/ww2d2vjh8c-lab/POS-BASIC-BILLING.git
    ```
 3. Open the `POS-BASIC-BILLING` folder and **double-click `INSTALL.bat`**.
 
-`INSTALL.bat` installs Node.js automatically if it is missing (via winget), installs
-dependencies, builds the app and installs it silently. A **Bloom Cafe POS** shortcut
-appears on the Desktop. Internet is only needed for this install — the app itself
-runs fully offline.
+`INSTALL.bat` then, on its own:
 
-**Updating later:** double-click `UPDATE.bat` (pulls the latest code and reinstalls).
-Sales, menu and settings are stored in the user's AppData folder and are kept.
+1. installs Node.js 22 with winget if it is missing or older than 20 (click **Yes** if Windows asks),
+2. downloads the dependencies (`npm ci`) and builds `dist\Bloom-Cafe-POS-Setup-<version>.exe`,
+3. closes Bloom Cafe POS if it is open (open tables are saved), backs up the data with `BACKUP-DATA.bat`,
+   and installs silently,
+4. checks the new version really is installed, then opens it.
+
+The first run takes 5–10 minutes. Internet is only needed for this — the app itself runs fully offline.
+Each step is written to **`install.log`** next to `INSTALL.bat`; if something fails, the window says
+what went wrong in plain words and that file has the details for support.
+
+### Updating
+
+Double-click **`UPDATE.bat`**. It downloads the latest version (`git fetch` + fast-forward only; files
+changed by hand in the folder are first kept aside with `git stash`), then runs `INSTALL.bat`.
+Git output goes to `update.log`. If the internet is down or the folder has its own commits, it stops
+without changing anything. (A folder downloaded as ZIP can run `INSTALL.bat` but cannot update itself.)
+
+### Where things live
+
+| What | Where |
+|---|---|
+| The app | `%LOCALAPPDATA%\Programs\Bloom Cafe POS\` — installed per user, no administrator needed |
+| Sales, menu, settings, the app's own daily backups and logs | `%APPDATA%\bloom-cafe-pos\` — **kept on update and on uninstall** |
+| Backups made by `BACKUP-DATA.bat` | `Desktop\Bloom Cafe POS Backups\<date_time>\` with `HOW-TO-RESTORE.txt` inside |
+| Shortcuts | **Bloom Cafe POS** on the Desktop and in the Start menu (the Desktop one is restored on every update) |
+
+`BACKUP-DATA.bat` can also be double-clicked any time for an extra backup.
 
 ### Alternative: prebuilt installer
 
-Download `Bloom-Cafe-POS-Windows-Setup` from the GitHub Actions artifacts and run the `.exe`.
+Download `Bloom-Cafe-POS-Setup-<version>.exe` from the
+[GitHub Releases page](https://github.com/ww2d2vjh8c-lab/POS-BASIC-BILLING/releases) (or the
+`Bloom-Cafe-POS-Windows-Setup` artifact of any Actions run) and double-click it. It upgrades an existing
+install in place and closes a running Bloom Cafe POS first. The installer is not code-signed, so Windows
+may show "Windows protected your PC": click **More info**, then **Run anyway**.
+`SHA256SUMS.txt` next to it lets you check the download.
+
+### Publishing a release
+
+1. Bump `"version"` in `package.json` and add a `## [x.y.z] — <date>` section to `CHANGELOG.md`.
+2. Merge to `main`, then tag it: `git tag v1.3.0` and `git push origin v1.3.0`.
+3. CI runs the tests, builds the installer, runs the install / update / uninstall check on Windows and
+   publishes the GitHub Release with that CHANGELOG section as the notes. A tag that does not match
+   `package.json` stops the build.
 
 The printer is auto-detected on the first print — no setup needed.
 
