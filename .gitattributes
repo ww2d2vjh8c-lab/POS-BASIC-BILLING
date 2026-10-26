@@ -1,1 +1,9 @@
+# Windows scripts must keep CRLF line endings (cmd.exe misreads LF-only batch files)
 *.bat text eol=crlf
+*.cmd text eol=crlf
+
+# NSIS shows this on the installer license page; plain-text license files must be CRLF
+build/license.txt text eol=crlf
+
+# Installer / app icons
+*.ico binary

@@ -6,7 +6,8 @@
     2. Desktop and Start menu shortcuts
     3. the installed app starts and creates its database in %APPDATA%\bloom-cafe-pos
        (better-sqlite3 loads from app.asar.unpacked, seed data from resources\data)
-    4. BACKUP-DATA.bat /auto copies the data to a dated Desktop folder
+    4. BACKUP-DATA.bat /auto closes the running app and copies the data
+       (live database + the app's own snapshots) to a dated Desktop folder
     5. re-running the installer silently while the app is open closes it,
        upgrades in place and keeps the data
     6. silent uninstall removes the app but keeps %APPDATA%\bloom-cafe-pos
@@ -85,7 +86,9 @@ Check ($backupExit -eq 0) "BACKUP-DATA.bat /auto exit code 0 (got $backupExit)"
 $latestBackup = Get-ChildItem (Join-Path $Desktop 'Bloom Cafe POS Backups') -Directory -ErrorAction SilentlyContinue |
   Sort-Object Name | Select-Object -Last 1
 Check ($null -ne $latestBackup -and (Test-Path (Join-Path $latestBackup.FullName 'bloom-cafe-pos\bloom-cafe.db'))) 'backup folder on the Desktop contains bloom-cafe.db'
+Check ($null -ne $latestBackup -and (Test-Path (Join-Path $latestBackup.FullName 'bloom-cafe-pos\backups'))) "backup folder contains the app's own snapshots (backups\)"
 Check ($null -ne $latestBackup -and (Test-Path (Join-Path $latestBackup.FullName 'HOW-TO-RESTORE.txt'))) 'backup folder contains HOW-TO-RESTORE.txt'
+Check (-not (Get-App)) 'BACKUP-DATA.bat /auto closed the app before copying'
 
 # 5. Upgrade while the app is open ------------------------------------------------
 if (-not (Get-App)) { Start-Process -FilePath $Exe -WorkingDirectory $InstallDir }
