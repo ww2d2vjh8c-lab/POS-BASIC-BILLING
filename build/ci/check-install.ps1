@@ -41,6 +41,45 @@ function Wait-Until([scriptblock] $condition, [int] $seconds) {
   return [bool](& $condition)
 }
 function Get-App { Get-Process -Name $ProcName -ErrorAction SilentlyContinue }
+
+# When something hangs, record what Windows was doing: every process with its
+# parent and command line, any window titles (a message box shows up here),
+# and a screenshot of the desktop.
+function Save-Diagnostics([string] $tag) {
+  try {
+    $procs = Get-CimInstance Win32_Process |
+      Select-Object ProcessId, ParentProcessId, Name, CommandLine | Sort-Object ProcessId
+    $procs | Format-Table -AutoSize -Wrap | Out-String -Width 400 |
+      Set-Content (Join-Path $LogsOut "processes-$tag.txt")
+    $procs | Where-Object { $_.Name -match 'Bloom|Un_|Setup|taskkill|tasklist|cmd' } |
+      Format-Table -AutoSize -Wrap | Out-String -Width 400 | Write-Host
+    Get-Process | Where-Object { $_.MainWindowTitle } |
+      Select-Object Id, ProcessName, MainWindowTitle | Format-Table -AutoSize | Out-String | Write-Host
+  } catch { Write-Host "process list failed: $_" }
+  try {
+    Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+    $b = [System.Windows.Forms.SystemInformation]::VirtualScreen
+    $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
+    $g = [System.Drawing.Graphics]::FromImage($bmp)
+    $g.CopyFromScreen($b.Left, $b.Top, 0, 0, $bmp.Size)
+    $bmp.Save((Join-Path $LogsOut "screen-$tag.png"))
+    $g.Dispose(); $bmp.Dispose()
+  } catch { Write-Host "screenshot failed: $_" }
+}
+
+# Runs an installer/uninstaller with a time limit instead of waiting forever.
+# Returns the exit code, or $null if it had to be stopped.
+function Invoke-Bounded([string] $file, [string] $arguments, [int] $seconds, [string] $tag) {
+  $p = Start-Process -FilePath $file -ArgumentList $arguments -PassThru
+  $null = $p.Handle   # keeps ExitCode readable after the process ends
+  if ($p.WaitForExit($seconds * 1000)) { return $p.ExitCode }
+  Write-Host "TIMEOUT  $tag did not finish within $seconds s - saving diagnostics" -ForegroundColor Red
+  Save-Diagnostics $tag
+  Get-CimInstance Win32_Process |
+    Where-Object { $_.Name -match '^(Bloom-Cafe-POS-Setup|Un_|Uninstall Bloom Cafe POS|Bloom Cafe POS)' } |
+    ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+  return $null
+}
 function Read-Reg([string] $path, [string] $name) {
   $item = Get-ItemProperty -Path $path -ErrorAction SilentlyContinue
   if ($item) { return $item.$name } else { return $null }
@@ -96,8 +135,8 @@ Check ([bool](Wait-Until { Get-App } 30)) 'app running before re-install'
 $setup = Get-ChildItem (Join-Path $Repo 'dist') -Filter 'Bloom-Cafe-POS-Setup-*.exe' | Select-Object -First 1
 Check ($null -ne $setup) 'versioned installer Bloom-Cafe-POS-Setup-<version>.exe in dist'
 if ($setup) {
-  $p = Start-Process -FilePath $setup.FullName -ArgumentList '/S' -Wait -PassThru
-  Check ($p.ExitCode -eq 0) "silent re-install of $($setup.Name) with the app open exits 0 (got $($p.ExitCode))"
+  $code = Invoke-Bounded $setup.FullName '/S' 300 'reinstall-with-app-open'
+  Check ($code -eq 0) "silent re-install of $($setup.Name) with the app open exits 0 within 5 min (got '$code')"
   Check (Test-Path $Exe) 'app still installed after re-install'
   Check (Test-Path $Db) 'database kept after re-install'
 }
@@ -108,7 +147,7 @@ $uninstaller = Join-Path $InstallDir 'Uninstall Bloom Cafe POS.exe'
 Check (Test-Path $uninstaller) 'uninstaller present'
 if (Test-Path $uninstaller) {
   # The NSIS uninstaller re-launches itself from %TEMP%, so poll for the result.
-  Start-Process -FilePath $uninstaller -ArgumentList '/S' -Wait
+  $null = Invoke-Bounded $uninstaller '/S' 300 'uninstall'
   Check (Wait-Until { -not (Test-Path $Exe) } 90) 'uninstall removed the app'
   Check (Wait-Until { -not (Test-Path $uninstallKey) } 30) 'uninstall removed the Add/Remove Programs entry'
   Check (Test-Path $Db) 'uninstall KEPT the sales database in %APPDATA%\bloom-cafe-pos'
