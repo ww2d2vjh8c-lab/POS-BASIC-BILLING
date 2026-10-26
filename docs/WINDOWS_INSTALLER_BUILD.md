@@ -92,9 +92,13 @@ looking for its data in `%APPDATA%\Bloom Cafe POS` and appear empty. For the sam
 "Anyone who uses this computer" (asks for admin) → install folder (can be changed) → install →
 finish page with "Run Bloom Cafe POS" ticked.
 
-**Upgrade / reinstall:** if Bloom Cafe POS is running it is closed first (a polite close, then a forced one
-after a few seconds; in silent mode without asking). The previous version is uninstalled with
-`--updated`, which never deletes app data, then the new files are copied in. The Desktop shortcut is
+**Upgrade / reinstall:** if Bloom Cafe POS is running it is closed first: the installer asks (in silent
+mode it goes ahead), asks the app to close, waits up to 10 s, force-closes anything left including helper
+processes, and waits until every process has exited (`build/installer.nsh`, `customCheckAppRunning`). The
+previous version is uninstalled with `--updated`, which never deletes app data, then the new files are
+copied in. If that uninstall reports an error the installer logs it and installs over the old files
+instead of stopping (`customUnInstallCheck`) — electron-builder's own handler showed a message box with
+no silent default there, which made `/S` installs hang while the app was open. The Desktop shortcut is
 recreated every time (`createDesktopShortcut: "always"`), even if someone deleted it. An existing
 "all users" install is upgraded in place (Windows asks for admin).
 
