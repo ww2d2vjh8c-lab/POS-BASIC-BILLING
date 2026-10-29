@@ -1,4 +1,4 @@
-# Bloom Cafe POS — v1.1.0
+# Bloom Cafe POS — v1.3.0
 
 **A professional Point of Sale system built for cafés, coffee shops, and small restaurants.**
 
@@ -55,13 +55,27 @@ It replaces handwritten bills and manual order tracking with a fast, reliable di
 
 ## First-Time Setup
 
-1. Run `Bloom_Cafe_POS_Setup.exe`
-2. Follow the installation wizard
-3. Launch **Bloom Cafe POS** from the desktop shortcut
+1. Double-click `Bloom-Cafe-POS-Setup-1.3.0.exe`
+   (if Windows says "Windows protected your PC", click **More info**, then **Run anyway** —
+   the installer is not code-signed)
+2. Follow the installation wizard — "Only for me" is the right choice and needs no administrator
+3. Bloom Cafe POS opens at the end; later, use the **Bloom Cafe POS** icon on the Desktop or in the Start menu
 4. Go to **Menu Manager** and add your menu items
 5. Go to **Inventory** and set your starting stock levels
-6. Go to **Printer Settings** and configure your receipt printer
+6. Print a test bill — the receipt printer is detected automatically
+   (if you change printers later, open **Printer Settings** to pick it up again)
 7. Start taking orders
+
+---
+
+## Updating and Your Data
+
+- To update, run the newer `Bloom-Cafe-POS-Setup-<version>.exe` (or double-click `UPDATE.bat` on a laptop
+  that was set up from GitHub). Bloom Cafe POS is closed automatically first; open tables are kept.
+- Sales, menu and settings are stored in `%APPDATA%\bloom-cafe-pos`. Updating or uninstalling the app
+  never deletes that folder.
+- `BACKUP-DATA.bat` copies that folder to **Desktop › Bloom Cafe POS Backups** (it also runs
+  automatically before every `INSTALL.bat` / `UPDATE.bat` install).
 
 ---
 

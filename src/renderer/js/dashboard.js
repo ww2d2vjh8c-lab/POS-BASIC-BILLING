@@ -12,7 +12,8 @@ function _getTodayStr() {
 async function openDashboard() {
   const modal = document.getElementById("dashboardModal");
   if (!modal) return;
-  modal.style.display = "block";
+  openModal("dashboardModal");
+  _syncTableCountUI();
 
   const today = _getTodayStr();
   _dashCurrentDate = today;
@@ -23,6 +24,7 @@ async function openDashboard() {
 
   await loadDashboardForDate(today);
   await loadWeeklyChart();
+  if (typeof loadBackupSummary === "function") loadBackupSummary();
 }
 
 async function loadDashboardForDate(dateStr) {
@@ -50,7 +52,7 @@ async function loadDashboardForDate(dateStr) {
       window.electronAPI.getSalesData(prevDate),
     ]);
 
-    const salesData = (response.success && response.data) ? response.data : { totalRevenue: 0, totalBills: 0, bills: [] };
+    const salesData = (response.success && response.data) ? response.data : { totalRevenue: 0, totalDiscount: 0, grossRevenue: 0, totalBills: 0, bills: [] };
     const prevData  = (prevResponse.success && prevResponse.data) ? prevResponse.data : null;
 
     // Stat values
@@ -67,10 +69,17 @@ async function loadDashboardForDate(dateStr) {
     const dashTotalBills   = document.getElementById("dashTotalBills");
     const dashAvgBill      = document.getElementById("dashAvgBill");
     const dashItemsSold    = document.getElementById("dashItemsSold");
-    if (dashTotalRevenue) dashTotalRevenue.textContent = "₹" + revenue.toFixed(0);
+    if (dashTotalRevenue) dashTotalRevenue.textContent = formatMoney(revenue, 0);
     if (dashTotalBills)   dashTotalBills.textContent   = String(bills);
-    if (dashAvgBill)      dashAvgBill.textContent      = "₹" + avgBill.toFixed(0);
+    if (dashAvgBill)      dashAvgBill.textContent      = formatMoney(avgBill, 0);
     if (dashItemsSold)    dashItemsSold.textContent    = String(totalItems);
+
+    // Discounts (stored per bill): revenue shown is net of discount.
+    const totalDiscount = Number(salesData.totalDiscount) || 0;
+    const grossRevenue  = Number(salesData.grossRevenue) || (revenue + totalDiscount);
+    const revenueSub = document.getElementById("dashRevenueSub");
+    if (revenueSub) revenueSub.textContent = totalDiscount > 0 ? `after ${formatMoney(totalDiscount, "auto")} discounts` : "";
+    _renderMoneySummary(grossRevenue, totalDiscount, revenue);
 
     // Delta indicators
     if (prevData) {
@@ -104,6 +113,17 @@ async function loadDashboardForDate(dateStr) {
   }
 }
 
+function _renderMoneySummary(gross, discount, net) {
+  const el = document.getElementById("dashMoneySummary");
+  if (!el) return;
+  if (!(gross > 0)) { el.style.display = "none"; el.replaceChildren(); return; }
+  el.innerHTML = `
+    <div class="dash-money-row"><span>Gross sales</span><span>${formatMoney(gross)}</span></div>
+    <div class="dash-money-row is-discount"><span>Discounts given</span><span>−${formatMoney(discount)}</span></div>
+    <div class="dash-money-row is-net"><span>Net revenue</span><span>${formatMoney(net)}</span></div>`;
+  el.style.display = "flex";
+}
+
 function _getPrevDateStr(dateStr) {
   const d = new Date(dateStr + "T12:00:00");
   d.setDate(d.getDate() - 1);
@@ -135,11 +155,15 @@ async function _updateLiveStrip(dateStr) {
   try {
     const resp = await window.electronAPI.getActiveOrders();
     if (!resp.success) { strip.classList.add("hidden"); return; }
-    const count = Object.keys(resp.data || {}).length;
+    const orders = resp.data || {};
+    const ids = Object.keys(orders).filter(id => Array.isArray(orders[id]) && orders[id].length > 0);
+    const running = ids.reduce((s, id) => s + cartTotals(orders[id]).total, 0);
+    const count = ids.length;
     strip.classList.remove("hidden");
+    strip.classList.toggle("is-idle", count === 0);
     strip.innerHTML = count > 0
-      ? `🟢 <strong>${count}</strong> table${count !== 1 ? "s" : ""} active right now`
-      : `⚪ All tables currently free`;
+      ? `<span class="status-dot status-dot-success"></span><span><strong>${count}</strong> open order${count !== 1 ? "s" : ""} right now · ${formatMoney(running)} not yet billed</span>`
+      : `<span class="status-dot"></span><span>All tables are currently free</span>`;
   } catch (e) { strip.classList.add("hidden"); }
 }
 
@@ -186,12 +210,12 @@ function renderPaymentBreakdown(bills) {
     return;
   }
 
-  const colors = { Cash: "#4CAF50", UPI: "#2196F3", Card: "#9C27B0", Other: "#FF9800" };
+  const colors = { Cash: "var(--color-pay-cash)", UPI: "var(--color-pay-upi)", Card: "var(--color-pay-card)", Other: "var(--color-warning)" };
   container.innerHTML = Object.entries(breakdown)
     .sort((a, b) => b[1] - a[1])
     .map(([mode, amount]) => {
       const pct   = total > 0 ? ((amount / total) * 100).toFixed(0) : 0;
-      const color = colors[mode] || "#888";
+      const color = colors[mode] || "var(--color-text-subtle)";
       return `
         <div class="dash-payment-row">
           <div class="dash-payment-dot" style="background:${color}"></div>
@@ -199,7 +223,7 @@ function renderPaymentBreakdown(bills) {
           <div class="dash-payment-bar-wrap">
             <div class="dash-payment-bar" style="width:${pct}%;background:${color}"></div>
           </div>
-          <span class="dash-payment-amount">₹${amount.toFixed(0)}</span>
+          <span class="dash-payment-amount">${formatMoney(amount, 0)}</span>
           <span class="dash-payment-pct">${pct}%</span>
         </div>`;
     }).join("");
@@ -227,18 +251,17 @@ function renderTopItems(bills) {
   }
 
   const maxQty  = sorted[0][1].qty;
-  const medals  = ["🥇", "🥈", "🥉"];
   container.innerHTML = sorted.map(([name, data], i) => {
     const barWidth = maxQty > 0 ? (data.qty / maxQty * 100).toFixed(0) : 0;
     return `
       <div class="dash-top-item-row">
-        <span class="dash-top-medal">${medals[i] || "  "}</span>
+        <span class="dash-rank ${i < 3 ? "dash-rank-" + (i + 1) : ""}">${i + 1}</span>
         <span class="dash-top-name">${escapeHTML(name)}</span>
         <div class="dash-top-bar-wrap">
           <div class="dash-top-bar" style="width:${barWidth}%"></div>
         </div>
         <span class="dash-top-qty">${data.qty}x</span>
-        <span class="dash-top-rev">₹${data.revenue.toFixed(0)}</span>
+        <span class="dash-top-rev">${formatMoney(data.revenue, 0)}</span>
       </div>`;
   }).join("");
 }
@@ -261,6 +284,8 @@ function renderBillsList(bills) {
 
   const badgeCls = { Cash: "dash-bill-badge-cash", UPI: "dash-bill-badge-upi", Card: "dash-bill-badge-card" };
 
+  // Bill numbers travel in data-* attributes (handled by one delegated listener),
+  // so no value is ever spliced into inline JavaScript.
   container.innerHTML = sorted.map(bill => {
     const time    = bill.time ? new Date(bill.time).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : "";
     const cls     = badgeCls[bill.paymentMode] || "dash-bill-badge-other";
@@ -269,17 +294,28 @@ function renderBillsList(bills) {
     const mode    = escapeHTML(bill.paymentMode || "Cash");
     return `
       <div class="dash-bill-row">
-        <span class="dash-bill-no">#${billNo}</span>
+        <span class="dash-bill-no" title="${billNo}">#${billNo}</span>
         <span class="dash-bill-time">${escapeHTML(time)}</span>
         <span class="dash-bill-table">${orderId}</span>
-        <span class="dash-bill-badge ${cls}">${mode}</span>
-        <span class="dash-bill-amount">₹${(bill.total || 0).toFixed(0)}</span>
+        <span class="badge dash-bill-badge ${cls}">${mode}</span>
+        <span class="dash-bill-amount">${formatMoney(bill.total || 0, "auto")}${Number(bill.discountAmount) > 0 ? `<span class="dash-bill-discount">−${formatMoney(bill.discountAmount, "auto")} disc.</span>` : ""}</span>
         <div class="dash-bill-actions">
-          <button class="dash-bill-btn dash-bill-reprint" onclick="reprintBill('${billNo}')" title="Reprint">🖨️</button>
-          <button class="dash-bill-btn dash-bill-delete"  onclick="deleteBill('${billNo}')"  title="Delete">🗑️</button>
+          <button type="button" class="dash-bill-btn dash-bill-reprint" data-bill-action="reprint" data-bill-no="${billNo}" title="Reprint" aria-label="Reprint bill ${billNo}">${icon("printer")}</button>
+          <button type="button" class="dash-bill-btn dash-bill-delete" data-bill-action="delete" data-bill-no="${billNo}" title="Delete" aria-label="Delete bill ${billNo}">${icon("trash")}</button>
         </div>
       </div>`;
   }).join("");
+}
+
+const _dashBillsListEl = document.getElementById("dashBillsList");
+if (_dashBillsListEl) {
+  _dashBillsListEl.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-bill-action]");
+    if (!btn) return;
+    const billNo = btn.dataset.billNo;
+    if (btn.dataset.billAction === "reprint") reprintBill(billNo);
+    else if (btn.dataset.billAction === "delete") deleteBill(billNo);
+  });
 }
 
 async function reprintBill(billNo) {
@@ -287,12 +323,11 @@ async function reprintBill(billNo) {
     const dateStr  = _dashCurrentDate || _getTodayStr();
     const response = await window.electronAPI.getSalesData(dateStr);
     if (!response.success) return showToast("Could not load bill", "error");
-    const bill = response.data.bills.find(b => b.billNo === billNo);
+    const bill = response.data.bills.find(b => String(b.billNo) === String(billNo));
     if (!bill) return showToast("Bill not found", "error");
     renderBillContent(bill);
-    const billModal = document.getElementById("billModal");
-    if (billModal) billModal.style.display = "block";
-    await printBill(billNo);
+    // printBill shows the print surface itself and hides it again afterwards.
+    await printBill(bill.billNo);
   } catch (e) {
     showToast("Reprint failed: " + e.message, "error");
   }
@@ -302,9 +337,11 @@ async function checkAndShowHealth() {
   try {
     const response = await window.electronAPI.getHealthStatus();
     if (!response.success) return;
-    const health = response.data;
-    if (!health.database) showToast("⚠️ Database integrity issue. Please backup immediately.", "error");
-    if (!health.diskSpace) showToast(`⚠️ Low disk space (${health.freeMB}MB free).`, "warning");
+    const health = response.data || {};
+    // A degraded database gets the persistent banner instead of a toast on every visit.
+    if (typeof renderSystemBanner === "function") renderSystemBanner(health.degraded);
+    if (health.database === false && !health.degraded) showToast("Database check failed — please contact support.", "error");
+    if (health.diskSpace === false) showToast(`Low disk space (${health.freeMB} MB free).`, "warning");
   } catch (e) {}
 }
 
@@ -374,7 +411,7 @@ async function exportDashboardData(type) {
       const response = await window.electronAPI.getSalesData(dateStr);
       if (!response.success || !response.data) { showToast("No data to export", "error"); return; }
       const bills = response.data.bills || [];
-      let csv = "Bill No,Time,Table,Items,Total,Payment\n";
+      let csv = _csvRow(["Bill No", "Time", "Table", "Items", "Subtotal", "Discount", "Total", "Payment"]);
       bills.forEach(bill => {
         const itemNames = (bill.items || []).map(i => `${i.name} x${i.quantity || 1}`).join(" | ");
         let time = "";
@@ -382,8 +419,16 @@ async function exportDashboardData(type) {
           const t = new Date(bill.time);
           time = isNaN(t.getTime()) ? bill.time : t.toLocaleTimeString("en-IN");
         }
-        csv += `"${bill.billNo || ""}","${time}","${bill.orderId || ""}","${itemNames}","${(bill.total || 0).toFixed(2)}","${bill.paymentMode || "Cash"}"\n`;
+        const total = Number(bill.total) || 0;
+        const discount = Number(bill.discountAmount) || 0;
+        const subtotal = typeof bill.subtotal === "number" ? bill.subtotal : total + discount;
+        csv += _csvRow([bill.billNo || "", time, bill.orderId || "", itemNames,
+          subtotal.toFixed(2), discount.toFixed(2), total.toFixed(2), bill.paymentMode || "Cash"]);
       });
+      const d = response.data;
+      csv += _csvRow(["TOTAL", "", "", `${bills.length} bills`,
+        (Number(d.grossRevenue) || 0).toFixed(2), (Number(d.totalDiscount) || 0).toFixed(2),
+        (Number(d.totalRevenue) || 0).toFixed(2), ""]);
       _downloadCSV(csv, `bloom-cafe-sales-${dateStr}.csv`);
 
     } else if (type === 'inventory') {
@@ -391,12 +436,12 @@ async function exportDashboardData(type) {
       const response = await window.electronAPI.getInventory();
       if (!response.success || !response.data) { showToast("No inventory data", "error"); return; }
       const items = response.data.items || [];
-      let csv = "Item Name,Stock,Low Stock Alert,Status\n";
+      let csv = _csvRow(["Item Name", "Stock", "Low Stock Alert", "Status"]);
       items.forEach(i => {
         const status = i.stock <= 0 ? "Out of Stock"
           : i.stock <= i.lowStock ? "Low Stock"
           : "In Stock";
-        csv += `"${i.name}","${i.stock}","${i.lowStock}","${status}"\n`;
+        csv += _csvRow([i.name, i.stock, i.lowStock, status]);
       });
       _downloadCSV(csv, `bloom-cafe-inventory-${dateStr}.csv`);
 
@@ -422,13 +467,15 @@ async function exportDashboardData(type) {
         });
       });
 
-      let csv = "Item,Qty Sold,Revenue,Remaining Stock\n";
+      let csv = _csvRow(["Item", "Qty Sold", "Revenue (before discount)", "Remaining Stock"]);
       Object.entries(itemMap)
         .sort((a, b) => b[1].qty - a[1].qty)
         .forEach(([name, data]) => {
           const stock = invMap[name.toLowerCase()] ?? "—";
-          csv += `"${name}","${data.qty}","${data.revenue.toFixed(2)}","${stock}"\n`;
+          csv += _csvRow([name, data.qty, data.revenue.toFixed(2), stock]);
         });
+      const totalDiscount = Number(salesRes.data?.totalDiscount) || 0;
+      if (totalDiscount > 0) csv += _csvRow(["Discounts given", "", (-totalDiscount).toFixed(2), ""]);
       _downloadCSV(csv, `bloom-cafe-combined-${dateStr}.csv`);
     }
 
@@ -439,8 +486,20 @@ async function exportDashboardData(type) {
   }
 }
 
+// One CSV line. Quotes are doubled, and text that a spreadsheet would treat as a
+// formula (=, +, -, @ at the start) is prefixed with ' — numbers pass through.
+function _csvRow(cells) {
+  return cells.map(v => {
+    let s = v === null || v === undefined ? "" : String(v);
+    const isNumber = typeof v === "number" || /^-?\d+(\.\d+)?$/.test(s);
+    if (!isNumber && /^[=+\-@\t\r]/.test(s)) s = "'" + s;
+    return '"' + s.replace(/"/g, '""') + '"';
+  }).join(",") + "\n";
+}
+
 function _downloadCSV(csv, filename) {
-  const blob = new Blob([csv], { type: "text/csv" });
+  // BOM so Excel opens the file as UTF-8 (₹ and non-English item names).
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement("a");
   a.href     = url;
@@ -450,8 +509,22 @@ function _downloadCSV(csv, filename) {
 }
 
 function closeDashboard() {
-  document.getElementById("dashboardModal").style.display = "none";
+  const menu = document.getElementById('dashExportMenu');
+  if (menu) menu.style.display = 'none';
+  _dashExportOpen = false;
+  closeModal("dashboardModal");
 }
+
+// Esc closes the export dropdown first, then the dashboard.
+registerModal("dashboardModal", () => {
+  const menu = document.getElementById('dashExportMenu');
+  if (_dashExportOpen && menu) {
+    menu.style.display = 'none';
+    _dashExportOpen = false;
+    return;
+  }
+  closeDashboard();
+});
 
 // ── Category revenue panel ────────────────────────────────────────────────────
 
@@ -468,7 +541,7 @@ async function renderCategoryRevenue(dateStr) {
 
     const categories = res.data.salesByCategory;
     const total = categories.reduce((s, c) => s + (c.revenue || 0), 0);
-    const palette = ["#c17f24","#2196F3","#4CAF50","#9C27B0","#FF9800","#F44336","#00BCD4"];
+    const palette = ["#B5491B", "#1F5FA6", "#2E7D4F", "#7A4AA8", "#C98A16", "#0F7B83", "#8A5A44"];
 
     container.innerHTML = categories
       .sort((a, b) => b.revenue - a.revenue)
@@ -482,7 +555,7 @@ async function renderCategoryRevenue(dateStr) {
             <div class="dash-payment-bar-wrap">
               <div class="dash-payment-bar" style="width:${pct}%;background:${color}"></div>
             </div>
-            <span class="dash-payment-amount">₹${(cat.revenue || 0).toFixed(0)}</span>
+            <span class="dash-payment-amount">${formatMoney(cat.revenue || 0, 0)}</span>
             <span class="dash-payment-pct">${pct}%</span>
           </div>`;
       }).join('');
@@ -512,22 +585,22 @@ async function renderInventoryHealth() {
     // Low stock list
     if (lowListEl) {
       lowListEl.innerHTML = lowStock.length === 0
-        ? '<div class="dash-inv-ok">All items well stocked ✅</div>'
+        ? '<div class="dash-inv-ok">All items well stocked</div>'
         : lowStock.map(i => `
             <div class="dash-inv-row">
               <span class="dash-inv-name">${escapeHTML(i.name)}</span>
-              <span class="dash-stock-badge dash-stock-low">${i.stock}</span>
+              <span class="badge badge-warning dash-stock-badge dash-stock-low">${escapeHTML(i.stock)} left</span>
             </div>`).join('');
     }
 
     // Out of stock list
     if (outListEl) {
       outListEl.innerHTML = outOfStock.length === 0
-        ? '<div class="dash-inv-ok">No items out of stock ✅</div>'
+        ? '<div class="dash-inv-ok">No items out of stock</div>'
         : outOfStock.map(i => `
             <div class="dash-inv-row">
               <span class="dash-inv-name">${escapeHTML(i.name)}</span>
-              <span class="dash-stock-badge dash-stock-out">Out of stock 🔴</span>
+              <span class="badge badge-danger dash-stock-badge dash-stock-out">Out of stock</span>
             </div>`).join('');
     }
   } catch (e) {
@@ -593,8 +666,57 @@ async function loadHourlyChart() {
   }
 }
 
-// ── Backward-compat ───────────────────────────────────────────────────────────
+// ── Number of tables (settings row) ──────────────────────────────────────────
 
-// Kept for backward-compat (called from old dashboard settings row, now removed — no-op)
+const MAX_TABLES = 50;
+
+function _syncTableCountUI() {
+  const n = (typeof appSettings !== "undefined" && appSettings.numberOfTables) || 6;
+  const valueEl = document.getElementById("dashTableCount");
+  const minus = document.getElementById("dashTableMinus");
+  const plus = document.getElementById("dashTablePlus");
+  if (valueEl) valueEl.textContent = String(n);
+  if (minus) minus.disabled = n <= 1;
+  if (plus) plus.disabled = n >= MAX_TABLES;
+}
+
+// Saves the new table count and redraws the table grid. Serialised so rapid
+// taps cannot interleave, and never hides a table that still has an open order.
+function changeTableCount(delta) {
+  return queueInventoryOperation("settings:numberOfTables", async () => {
+    const current = appSettings.numberOfTables || 6;
+    const next = Math.min(MAX_TABLES, Math.max(1, current + delta));
+    if (next === current) return;
+
+    if (next < current) {
+      try {
+        const res = await window.electronAPI.getActiveOrders();
+        const orders = (res && res.success && res.data) || {};
+        const busyNums = Object.keys(orders)
+          .filter(id => /^Table \d+$/.test(id) && Array.isArray(orders[id]) && orders[id].length > 0)
+          .map(id => parseInt(id.slice(6), 10));
+        const highestBusy = busyNums.length ? Math.max(...busyNums) : 0;
+        if (highestBusy > next) {
+          showToast(`Table ${highestBusy} has an open order — bill it before removing tables`, "warning");
+          return;
+        }
+      } catch (_) { /* fall through: saving is still safe */ }
+    }
+
+    appSettings.numberOfTables = next;
+    _syncTableCountUI();
+    renderTableGrid(next);
+    try {
+      const res = await window.electronAPI.saveSettings({ numberOfTables: next });
+      if (!res || !res.success) throw new Error(res?.error || "save failed");
+    } catch (e) {
+      appSettings.numberOfTables = current;
+      _syncTableCountUI();
+      renderTableGrid(current);
+      showToast("Could not save the number of tables", "error");
+    }
+  });
+}
+
+// Kept for backward-compat (old dashboard settings loader — no-op)
 async function loadDashboardSettings() {}
-async function changeTableCount(delta) {}

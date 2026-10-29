@@ -38,7 +38,9 @@ function register(ipcMain) {
     try {
       const settings = queries.readSettings();
       settings.inventoryEnabled = !settings.inventoryEnabled;
-      queries.saveSettings(settings);
+      // Write only the flag: re-saving every parsed setting would rewrite
+      // unrelated rows (e.g. a bad numberOfTables would be stored as "NaN").
+      queries.saveSettings({ inventoryEnabled: settings.inventoryEnabled });
       return { success: true, data: settings };
     } catch (e) {
       logger.error('IPC_ERROR', { channel: 'toggle-inventory', error: e.message });

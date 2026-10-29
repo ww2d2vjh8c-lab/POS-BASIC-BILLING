@@ -19,19 +19,34 @@ async function openInventoryManager() {
   try {
     const modal = document.getElementById('inventoryModal');
     if (!modal) return;
-    modal.style.display = 'block';
+    openModal('inventoryModal');
     await _loadAllInventoryData();
-    _showTab('stock');
+    _showTab(_invCurrentTab);
   } catch (e) {
     console.error('openInventoryManager error:', e);
     showToast('Failed to open inventory', 'error');
   }
 }
 
-function closeInventoryManager() {
-  document.getElementById('inventoryModal').style.display = 'none';
+function _closeInventoryNow() {
+  closeModal('inventoryModal');
+  if (_invRestockMode) cancelRestockMode();
   _invRestockMode = false;
   _invRestockChanges = {};
+}
+
+// Never silently throw away unsaved restock counts.
+function closeInventoryManager() {
+  const pending = Object.keys(_invRestockChanges).length;
+  if (_invRestockMode && pending > 0) {
+    showConfirmModal(
+      `You have ${pending} unsaved restock change${pending !== 1 ? 's' : ''}. Close without saving?`,
+      _closeInventoryNow,
+      { confirmLabel: 'Discard Changes', tone: 'warning', title: 'Discard restock changes?' }
+    );
+    return;
+  }
+  _closeInventoryNow();
 }
 
 // ── Data loading ──────────────────────────────────────────────────────────────
@@ -84,7 +99,7 @@ function _renderSummaryBar() {
   let well = 0, low = 0, out = 0;
   _invSnapshot.forEach(item => {
     const stock   = Number(item.stock)   || 0;
-    const alertAt = Number(item.lowStock) || 10;
+    const alertAt = _alertLevel(item);
     if (stock <= 0)              out++;
     else if (stock <= alertAt)   low++;
     else                         well++;
@@ -120,15 +135,19 @@ function renderStockTab() {
     groups[cat].push(item);
   });
 
+  // Remember collapsed groups across re-renders (stock +/- re-renders the list).
+  const collapsed = new Set(Array.from(container.querySelectorAll('.inv-category-section.collapsed'))
+    .map(el => el.dataset.category));
+
   container.innerHTML = Object.entries(groups).map(([cat, items]) => {
     const rows = items.map(item => _buildItemRow(item)).join('');
     return `
-      <div class="inv-category-section">
-        <div class="inv-category-header" onclick="this.parentElement.classList.toggle('collapsed')">
-          <span class="inv-cat-arrow">▼</span>
+      <div class="inv-category-section ${collapsed.has(cat) ? 'collapsed' : ''}" data-category="${escapeHTML(cat)}">
+        <button type="button" class="inv-category-header" data-inv-action="toggle-group">
+          <span class="inv-cat-arrow">${icon('chevron-down', 'icon-sm')}</span>
           <span class="inv-cat-name">${escapeHTML(cat)}</span>
           <span class="inv-cat-count">${items.length} item${items.length !== 1 ? 's' : ''}</span>
-        </div>
+        </button>
         <div class="inv-category-body">
           ${rows}
         </div>
@@ -136,47 +155,51 @@ function renderStockTab() {
   }).join('');
 }
 
+function _alertLevel(item) {
+  const n = Number(item.lowStock);
+  return item.lowStock === null || item.lowStock === undefined || item.lowStock === '' || isNaN(n) ? 10 : n;
+}
+
+// Item names live only in escaped data-name attributes; one delegated listener
+// reads them back (decoded) — names with quotes or < > can never break a handler.
 function _buildItemRow(item) {
   const stock   = Number(item.stock)   || 0;
-  const alertAt = Number(item.lowStock) || 10;
+  const alertAt = _alertLevel(item);
   const isOut  = stock <= 0;
   const isLow  = !isOut && stock <= alertAt;
   const dotCls = isOut ? 'inv-dot-red' : isLow ? 'inv-dot-yellow' : 'inv-dot-green';
   const rowCls = isOut ? 'inv-row-out' : isLow ? 'inv-row-low' : '';
   const name   = escapeHTML(item.name);
+  const status = isOut ? 'Out of stock' : isLow ? 'Low stock' : 'In stock';
 
   if (_invRestockMode) {
-    const cur = _invRestockChanges.hasOwnProperty(item.name)
+    const cur = Object.prototype.hasOwnProperty.call(_invRestockChanges, item.name)
       ? _invRestockChanges[item.name]
       : stock;
     return `
       <div class="inv-item-row ${rowCls}" data-name="${name}">
-        <span class="inv-status-dot ${dotCls}"></span>
+        <span class="inv-status-dot ${dotCls}" title="${status}"></span>
         <span class="inv-item-name">${name}</span>
         <div class="inv-stock-control">
-          <input type="number" class="inv-restock-input" value="${cur}" min="0"
-            data-item="${name}"
-            onchange="invRestockChange('${name}', this.value)" />
+          <input type="number" class="inv-restock-input" value="${cur}" min="0" data-inv-field="restock" aria-label="New stock for ${name}" />
         </div>
-        <input type="number" class="inv-alert-input" value="${alertAt}" min="0"
-          onchange="updateLowStockAlert('${item.name}', this.value)" />
+        <input type="number" class="inv-alert-input" value="${alertAt}" min="0" data-inv-field="alert" aria-label="Low-stock alert for ${name}" />
         <div></div>
       </div>`;
   }
 
   return `
     <div class="inv-item-row ${rowCls}" data-name="${name}">
-      <span class="inv-status-dot ${dotCls}"></span>
+      <span class="inv-status-dot ${dotCls}" title="${status}"></span>
       <span class="inv-item-name">${name}</span>
       <div class="inv-stock-control">
-        <button class="inv-qty-btn" onclick="adjustStock('${escapeHTML(item.name)}', -1)">−</button>
+        <button type="button" class="inv-qty-btn" data-inv-action="adjust" data-delta="-1" aria-label="Decrease stock of ${name}">${icon('minus')}</button>
         <span class="inv-stock-number ${isOut ? 'inv-stock-zero' : isLow ? 'inv-stock-low' : ''}">${stock}</span>
-        <button class="inv-qty-btn" onclick="adjustStock('${escapeHTML(item.name)}', 1)">+</button>
+        <button type="button" class="inv-qty-btn" data-inv-action="adjust" data-delta="1" aria-label="Increase stock of ${name}">${icon('plus')}</button>
       </div>
-      <input type="number" class="inv-alert-input" value="${alertAt}" min="0"
-        onchange="updateLowStockAlert('${escapeHTML(item.name)}', this.value)" />
+      <input type="number" class="inv-alert-input" value="${alertAt}" min="0" data-inv-field="alert" aria-label="Low-stock alert for ${name}" />
       <div class="inv-row-actions">
-        <button class="inv-delete-btn" onclick="deleteInventoryItem('${escapeHTML(item.name)}')" title="Remove">🗑️</button>
+        <button type="button" class="inv-delete-btn" data-inv-action="delete" title="Remove" aria-label="Remove ${name}">${icon('trash')}</button>
       </div>
     </div>`;
 }
@@ -189,7 +212,11 @@ function toggleAddItemForm() {
   if (!form) return;
   const visible = form.style.display !== 'none';
   form.style.display = visible ? 'none' : '';
-  if (btn) btn.textContent = visible ? '➕ Add Item' : '✕ Cancel';
+  if (btn) {
+    btn.innerHTML = visible ? `${icon('plus')}Add Item` : `${icon('x')}Cancel`;
+    btn.className = visible ? 'btn btn-primary inv-add-toggle-btn' : 'btn btn-secondary inv-add-toggle-btn';
+  }
+  if (!visible) document.getElementById('invItemName')?.focus();
 }
 
 function toggleRestockMode() {
@@ -257,6 +284,8 @@ async function adjustStock(itemName, delta) {
         renderStockTab();
         _renderSummaryBar();
         showToast(result.error || 'Failed to update stock', 'error');
+        // The item was removed/renamed elsewhere — show what is really there now.
+        if (result.error === 'Item not found') await _loadAllInventoryData();
       }
     } catch (e) {
       console.error('adjustStock error:', e);
@@ -275,7 +304,7 @@ async function updateLowStockAlert(itemName, value) {
       const item = _invSnapshot.find(i => i.name === itemName);
       if (!item) { await _loadAllInventoryData(); return; }
 
-      const prev = Number(item.lowStock) || 0;
+      const prev = item.lowStock;
       item.lowStock = parsed;
       _renderSummaryBar();
 
@@ -357,10 +386,10 @@ function renderSyncTab() {
     } else {
       if (missingEmptyEl) missingEmptyEl.style.display = 'none';
       missingEl.innerHTML = missing.map(p => `
-        <div class="inv-missing-row">
+        <div class="inv-missing-row" data-name="${escapeHTML(p.productName)}" data-product-id="${escapeHTML(p.productId)}">
           <span class="inv-missing-name">${escapeHTML(p.productName)}</span>
-          <span class="inv-category-badge">${escapeHTML(p.categoryName)}</span>
-          <button class="inv-sync-one-btn" onclick="syncSingleProduct(${p.productId}, '${escapeHTML(p.productName)}')">+ Add to Inventory</button>
+          <span class="badge inv-category-badge">${escapeHTML(p.categoryName)}</span>
+          <button type="button" class="btn btn-secondary btn-sm inv-sync-one-btn" data-inv-action="sync-one">${icon('plus', 'icon-sm')}Add to Inventory</button>
         </div>`).join('');
     }
   }
@@ -375,11 +404,11 @@ function renderSyncTab() {
     } else {
       if (unlinkedEmptyEl) unlinkedEmptyEl.style.display = 'none';
       unlinkedEl.innerHTML = unlinked.map(i => `
-        <div class="inv-sync-row">
+        <div class="inv-sync-row" data-name="${escapeHTML(i.name)}">
           <span class="inv-sync-name">${escapeHTML(i.name)}</span>
-          <span class="inv-untracked-badge">Not Connected</span>
-          <span class="inv-sync-stock">Stock: ${i.stock}</span>
-          <button class="inv-delete-btn" onclick="deleteInventoryItem('${escapeHTML(i.name)}')" title="Remove">🗑️</button>
+          <span class="badge badge-warning inv-untracked-badge">Not Connected</span>
+          <span class="inv-sync-stock">Stock: ${escapeHTML(i.stock)}</span>
+          <button type="button" class="inv-delete-btn" data-inv-action="delete" title="Remove" aria-label="Remove ${escapeHTML(i.name)}">${icon('trash')}</button>
         </div>`).join('');
     }
   }
@@ -396,9 +425,9 @@ function renderSyncTab() {
       linkedEl.innerHTML = linked.map(i => `
         <div class="inv-sync-row">
           <span class="inv-sync-name">${escapeHTML(i.name)}</span>
-          <span class="inv-category-badge">${escapeHTML(i.categoryName || '')}</span>
-          <span class="inv-linked-badge">Linked</span>
-          <span class="inv-sync-stock">Stock: ${i.stock}</span>
+          ${i.categoryName ? `<span class="badge inv-category-badge">${escapeHTML(i.categoryName)}</span>` : ''}
+          <span class="badge badge-success inv-linked-badge">Linked</span>
+          <span class="inv-sync-stock">Stock: ${escapeHTML(i.stock)}</span>
         </div>`).join('');
     }
   }
@@ -477,7 +506,7 @@ function renderHistoryTab() {
       <td class="inv-hist-name">${escapeHTML(entry.item_name || '')}</td>
       <td class="inv-hist-action">${escapeHTML(action)}</td>
       <td class="inv-hist-delta ${deltaCls}">${sign}${delta}</td>
-      <td><span class="inv-source-badge ${badgeCls}">${escapeHTML(src.replace(/_/g, ' '))}</span></td>
+      <td><span class="badge inv-source-badge ${badgeCls}">${escapeHTML(src.replace(/_/g, ' '))}</span></td>
     </tr>`;
   }).join('');
 }
@@ -493,3 +522,52 @@ function _setVisible(id, visible) {
   const el = document.getElementById(id);
   if (el) el.style.display = visible ? '' : 'none';
 }
+
+// ── Delegated events (stock list + sync tab) ─────────────────────────────────
+
+function _rowName(el) {
+  const row = el.closest('[data-name]');
+  return row ? row.dataset.name : null;   // dataset returns the decoded original name
+}
+
+function _onInventoryClick(e) {
+  const btn = e.target.closest('[data-inv-action]');
+  if (!btn) return;
+  const action = btn.dataset.invAction;
+  if (action === 'toggle-group') {
+    btn.closest('.inv-category-section')?.classList.toggle('collapsed');
+    return;
+  }
+  const name = _rowName(btn);
+  if (name === null) return;
+  if (action === 'adjust') adjustStock(name, parseInt(btn.dataset.delta, 10) || 0);
+  else if (action === 'delete') deleteInventoryItem(name);
+  else if (action === 'sync-one') {
+    const row = btn.closest('[data-product-id]');
+    syncSingleProduct(row ? row.dataset.productId : null, name);
+  }
+}
+
+function _onInventoryChange(e) {
+  const input = e.target.closest('[data-inv-field]');
+  if (!input) return;
+  const name = _rowName(input);
+  if (name === null) return;
+  if (input.dataset.invField === 'alert') updateLowStockAlert(name, input.value);
+  else if (input.dataset.invField === 'restock') invRestockChange(name, input.value);
+}
+
+['invCategoryGroups', 'invTabSync'].forEach(id => {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.addEventListener('click', _onInventoryClick);
+  el.addEventListener('change', _onInventoryChange);
+});
+
+// Restock counts are recorded as they are typed, not only on blur.
+document.getElementById('invCategoryGroups')?.addEventListener('input', (e) => {
+  const input = e.target.closest('[data-inv-field="restock"]');
+  if (input) invRestockChange(_rowName(input), input.value);
+});
+
+registerModal('inventoryModal', closeInventoryManager);

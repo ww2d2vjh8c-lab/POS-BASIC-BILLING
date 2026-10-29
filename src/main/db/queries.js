@@ -1,26 +1,51 @@
+'use strict';
+
 const { getDB } = require("./database");
+const { roundMoney } = require("../validator");
+
+/** YYYY-MM-DD in local time (bills are stored by local business date, not UTC). */
+function localDate(d = new Date()) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** Strips the "(Half)" / "(Full)" variant suffix to get the inventory item name. */
+function baseItemName(name) {
+  return String(name || "").replace(/\s*\(Half\)|\s*\(Full\)/gi, "").trim();
+}
+
+// Prepared statements for hot paths (every cart change / sale), cached per
+// connection so a reopened database (restore, recovery) gets fresh ones.
+const _stmtCache = new WeakMap();
+function stmt(sql) {
+  const db = getDB();
+  let cache = _stmtCache.get(db);
+  if (!cache) { cache = new Map(); _stmtCache.set(db, cache); }
+  let s = cache.get(sql);
+  if (!s) { s = db.prepare(sql); cache.set(sql, s); }
+  return s;
+}
 
 /**
- * Calculates the total cost of a cart items array.
+ * Calculates the total cost of a cart items array, rounded to paise.
  * Single source of truth — used by all IPC handlers that touch cart totals.
  */
 function calculateCartTotal(items) {
   if (!Array.isArray(items)) return 0;
-  return items.reduce((acc, item) => {
+  return roundMoney(items.reduce((acc, item) => {
     const addonsTotal = Array.isArray(item.addons)
       ? item.addons.reduce((a, ad) => a + (ad.price || 0), 0)
       : 0;
     return acc + ((item.price || 0) + addonsTotal) * (item.quantity || 0);
-  }, 0);
+  }, 0));
 }
 
 /**
  * Returns the current stock for a single inventory item by name (case-insensitive).
- * Returns null if the item is not tracked in inventory.
+ * Returns null if the item is not tracked in inventory (no row, or archived).
  */
 function getInventoryStockByName(name) {
-  const row = getDB().prepare(
-    "SELECT stock FROM inventory WHERE LOWER(name) = LOWER(?)"
+  const row = stmt(
+    "SELECT stock FROM inventory WHERE LOWER(name) = LOWER(?) AND archived = 0"
   ).get(name);
   return row ? row.stock : null;
 }
@@ -49,28 +74,30 @@ function readMenu() {
     ORDER BY c.sort_order ASC, c.name ASC, p.sort_order ASC, p.name ASC, a.name ASC 
   `).all(); 
  
-  // Assemble nested structure from flat rows 
-  const catMap = new Map(); 
- 
-  rows.forEach(row => { 
-    if (!catMap.has(row.cat_id)) { 
-      catMap.set(row.cat_id, { name: row.cat_name, products: [] }); 
-    } 
-    if (!row.prod_id) return; // Category exists but has no products 
- 
-    const cat = catMap.get(row.cat_id); 
-    let product = cat.products.find(p => p.name === row.prod_name); 
-    if (!product) { 
+  // Assemble nested structure from flat rows (one row per product × addon)
+  const catMap = new Map();
+  const productMap = new Map(); // prod_id → product, so assembly stays O(rows)
+
+  rows.forEach(row => {
+    if (!catMap.has(row.cat_id)) {
+      catMap.set(row.cat_id, { name: row.cat_name, products: [] });
+    }
+    if (!row.prod_id) return; // Category exists but has no products
+
+    const cat = catMap.get(row.cat_id);
+    let product = productMap.get(row.prod_id);
+    if (!product) {
       product = { 
         name: row.prod_name, 
         price: row.price, 
         halfPrice: row.half_price, 
         hasVariants: row.has_variants === 1, 
         available: row.available === 1, 
-        addons: [] 
-      }; 
-      cat.products.push(product); 
-    } 
+        addons: []
+      };
+      productMap.set(row.prod_id, product);
+      cat.products.push(product);
+    }
     if (row.addon_name) { 
       product.addons.push({ name: row.addon_name, price: row.addon_price }); 
     } 
@@ -113,31 +140,34 @@ function getProductId(categoryName, productName) {
   return row.id;
 }
 
+/** Inserts a product and its add-ons in one transaction; returns the new product id. */
 function addProduct(categoryName, product) {
   const db = getDB();
   const catId = getCategoryId(categoryName);
-  const insertProduct = db.prepare("INSERT INTO products (category_id, name, price, half_price, has_variants, available) VALUES (?, ?, ?, ?, ?, ?)");
-  const inserted = insertProduct.run(
-    catId,
-    product.name,
-    product.price || 0,
-    product.halfPrice || null,
-    product.hasVariants ? 1 : 0,
-    product.unavailable === true ? 0 : 1
-  );
+  return db.transaction(() => {
+    const inserted = db.prepare("INSERT INTO products (category_id, name, price, half_price, has_variants, available) VALUES (?, ?, ?, ?, ?, ?)").run(
+      catId,
+      product.name,
+      product.price || 0,
+      product.halfPrice || null,
+      product.hasVariants ? 1 : 0,
+      product.unavailable === true ? 0 : 1
+    );
 
-  if (Array.isArray(product.addons) && product.addons.length > 0) {
-    const insertAddon = db.prepare("INSERT OR IGNORE INTO addons (name, price) VALUES (?, ?)");
-    const getAddonId = db.prepare("SELECT id FROM addons WHERE name = ?");
-    const linkAddon = db.prepare("INSERT OR IGNORE INTO product_addons (product_id, addon_id) VALUES (?, ?)");
-    product.addons.forEach(addon => {
-      insertAddon.run(addon.name, addon.price || 0);
-      const addonRow = getAddonId.get(addon.name);
-      if (addonRow) {
-        linkAddon.run(inserted.lastInsertRowid, addonRow.id);
-      }
-    });
-  }
+    if (Array.isArray(product.addons) && product.addons.length > 0) {
+      const insertAddon = db.prepare("INSERT OR IGNORE INTO addons (name, price) VALUES (?, ?)");
+      const getAddonId = db.prepare("SELECT id FROM addons WHERE name = ?");
+      const linkAddon = db.prepare("INSERT OR IGNORE INTO product_addons (product_id, addon_id) VALUES (?, ?)");
+      product.addons.forEach(addon => {
+        insertAddon.run(addon.name, addon.price || 0);
+        const addonRow = getAddonId.get(addon.name);
+        if (addonRow) {
+          linkAddon.run(inserted.lastInsertRowid, addonRow.id);
+        }
+      });
+    }
+    return Number(inserted.lastInsertRowid);
+  })();
 }
 
 function editProductPrice(categoryName, productName, price, halfPrice) {
@@ -195,7 +225,7 @@ function removeAddon(categoryName, productName, name) {
  */
 function writeInventoryAuditLog(itemName, delta, action, source, billNo) {
   try {
-    getDB().prepare(`
+    stmt(`
       INSERT INTO inventory_audit_log (item_name, quantity_change, reason, source, bill_no)
       VALUES (?, ?, ?, ?, ?)
     `).run(itemName, delta, action || 'adjusted', source || 'manual', billNo || null);
@@ -251,17 +281,37 @@ function readInventory() {
   };
 }
 
+/** Sets an item's stock. Returns false if no such item exists. */
 function updateStock(name, newStock, source) {
-  const db = getDB();
-  const prev = db.prepare("SELECT stock FROM inventory WHERE LOWER(name) = LOWER(?)").get(name);
-  db.prepare("UPDATE inventory SET stock = ?, updated_at = datetime('now') WHERE name = ?").run(newStock, name);
-  if (prev != null) {
-    writeInventoryAuditLog(name, newStock - prev.stock, 'adjusted', source || 'manual', null);
-  }
+  const prev = stmt("SELECT name, stock FROM inventory WHERE LOWER(name) = LOWER(?)").get(name);
+  if (!prev) return false;
+  stmt("UPDATE inventory SET stock = ?, updated_at = datetime('now') WHERE name = ?").run(newStock, prev.name);
+  writeInventoryAuditLog(prev.name, newStock - (prev.stock || 0), 'adjusted', source || 'manual', null);
+  return true;
 }
 
 function updateLowstock(name, alertAt) {
-  getDB().prepare("UPDATE inventory SET low_stock_alert = ?, updated_at = datetime('now') WHERE name = ?").run(alertAt, name);
+  getDB().prepare("UPDATE inventory SET low_stock_alert = ?, updated_at = datetime('now') WHERE LOWER(name) = LOWER(?)").run(alertAt, name);
+}
+
+/**
+ * Makes sure a product has an active inventory row without touching the
+ * stock of a row that already exists (adding a product called "Coke" must
+ * not wipe out the 50 Cokes already counted in inventory).
+ */
+function ensureInventoryItem(name, productId, source) {
+  const db = getDB();
+  const existing = db.prepare("SELECT name FROM inventory WHERE LOWER(name) = LOWER(?)").get(name);
+  if (existing) {
+    db.prepare(`
+      UPDATE inventory
+      SET product_id = COALESCE(product_id, ?), archived = 0, updated_at = datetime('now')
+      WHERE name = ?
+    `).run(productId || null, existing.name);
+    return false;
+  }
+  addInventoryItem({ name, stock: 0, alertAt: 5, product_id: productId || null, source: source || 'auto' });
+  return true;
 }
 
 function addInventoryItem(item) {
@@ -276,7 +326,7 @@ function addInventoryItem(item) {
         product_id = COALESCE(excluded.product_id, inventory.product_id),
         archived = 0,
         updated_at = datetime('now')
-    `).run(item.name, item.stock || 0, item.alertAt || 5, item.product_id || null);
+    `).run(item.name, item.stock ?? 0, item.alertAt ?? 5, item.product_id || null);
   } catch (_e) {
     // Fallback for pre-v3 schema (no product_id / archived columns)
     db.prepare(`
@@ -286,9 +336,9 @@ function addInventoryItem(item) {
         stock = excluded.stock,
         low_stock_alert = excluded.low_stock_alert,
         updated_at = datetime('now')
-    `).run(item.name, item.stock || 0, item.alertAt || 5);
+    `).run(item.name, item.stock ?? 0, item.alertAt ?? 5);
   }
-  writeInventoryAuditLog(item.name, item.stock || 0, 'created', item.source || 'manual', null);
+  writeInventoryAuditLog(item.name, item.stock ?? 0, 'created', item.source || 'manual', null);
 }
 
 /**
@@ -390,48 +440,31 @@ function syncInventoryToMenu() {
 
 /**
  * Bulk-update stock for multiple items at once (used by Restock mode).
+ * All-or-nothing; returns how many items actually exist and were updated.
  */
 function bulkUpdateStock(updates) {
   if (!Array.isArray(updates) || updates.length === 0) return { updated: 0 };
   const db = getDB();
   const tx = db.transaction((list) => {
-    list.forEach(u => updateStock(u.name, u.stock, 'restock'));
+    let updated = 0;
+    list.forEach(u => { if (updateStock(u.name, u.stock, 'restock')) updated++; });
+    return updated;
   });
-  tx(updates);
-  return { updated: updates.length };
+  return { updated: tx(updates) };
 }
 
-function deductInventory(items) {
+function restoreInventory(items, billNo = null) {
   const db = getDB();
-  const stmt = db.prepare(  // ← OUTSIDE the loop
-    "UPDATE inventory SET stock = MAX(0, stock - ?) WHERE LOWER(name) = LOWER(?)"
-  );
-  const deduct = db.transaction((list) => {
-    list.forEach(soldItem => {
-      const base = soldItem.name.replace(/\s*\(Half\)|\s*\(Full\)/gi, "").trim();
-      const qty = soldItem.quantity || 1;
-      const result = stmt.run(qty, base);
-      if (result.changes === 0) {
-        console.warn("[INVENTORY_MISS]", base);
-      } else {
-        writeInventoryAuditLog(base, -qty, 'deducted', 'sale', null);
-      }
-    });
-  });
-  deduct(items);
-}
-
-function restoreInventory(items) {
-  const db = getDB();
-  const stmt = db.prepare(  // ← OUTSIDE the loop
-    "UPDATE inventory SET stock = stock + ? WHERE LOWER(name) = LOWER(?)"
+  const update = db.prepare(
+    "UPDATE inventory SET stock = stock + ?, updated_at = datetime('now') WHERE LOWER(name) = LOWER(?)"
   );
   const restore = db.transaction((list) => {
     list.forEach(item => {
-      const base = item.name.replace(/\s*\(Half\)|\s*\(Full\)/gi, "").trim();
+      const base = baseItemName(item.name);
       const qty = item.quantity || 1;
-      stmt.run(qty, base);
-      writeInventoryAuditLog(base, qty, 'restored', 'bill_delete', null);
+      if (update.run(qty, base).changes > 0) {
+        writeInventoryAuditLog(base, qty, 'restored', 'bill_delete', billNo);
+      }
     });
   });
   restore(items);
@@ -443,67 +476,106 @@ function readSessions() {
   orders.forEach(o => {
     try { sessions[o.order_id] = JSON.parse(o.items); } catch(e) { sessions[o.order_id] = []; }
   });
-  return { date: new Date().toISOString().split("T")[0], sessions };
+  return { date: localDate(), sessions };
 }
 
+/**
+ * Persists an open cart. A table that was billed earlier still has its
+ * orders row (status 'completed'), so the upsert must flip it back to
+ * 'active' — otherwise the new cart is not restored after a restart.
+ */
 function saveSession(orderId, sessionOrItems) {
-  const db = getDB();
   const items = Array.isArray(sessionOrItems) ? sessionOrItems : (sessionOrItems?.items || []);
-  const total = items.reduce((sum, item) => {
-    const addonTotal = (item.addons || []).reduce((a, ad) => a + (ad.price || 0), 0);
-    return sum + (item.price + addonTotal) * item.quantity;
-  }, 0);
-  db.prepare("INSERT INTO orders (order_id, items, total, status, updated_at) VALUES (?, ?, ?, 'active', datetime('now')) ON CONFLICT(order_id) DO UPDATE SET items = excluded.items, total = excluded.total, updated_at = datetime('now')").run(orderId, JSON.stringify(items), total);
+  stmt(`
+    INSERT INTO orders (order_id, items, total, status, updated_at)
+    VALUES (?, ?, ?, 'active', datetime('now'))
+    ON CONFLICT(order_id) DO UPDATE SET
+      items = excluded.items, total = excluded.total, status = 'active', updated_at = datetime('now')
+  `).run(orderId, JSON.stringify(items), calculateCartTotal(items));
 }
 
 function removeSession(orderId) {
-  getDB().prepare("UPDATE orders SET status = 'completed', updated_at = datetime('now') WHERE order_id = ?").run(orderId);
+  stmt("UPDATE orders SET status = 'completed', updated_at = datetime('now') WHERE order_id = ?").run(orderId);
 }
 
+/** Deletes closed carts older than a week (the bills themselves are kept). */
+function cleanupOldOrders() {
+  return getDB().prepare(
+    "DELETE FROM orders WHERE status = 'completed' AND updated_at < datetime('now', '-7 days')"
+  ).run().changes;
+}
+
+/**
+ * All bills for a business date. `total` is what the customer paid (after
+ * discount); `subtotal` is the item value before discount.
+ */
 function readSalesData(date) {
   const db = getDB();
   const bills = db.prepare(`
-    SELECT id, bill_no, order_id, items, total, payment_mode, bill_date, time, print_status, created_at, cash_received
+    SELECT id, bill_no, order_id, items, total, payment_mode, bill_date, time, print_status, created_at,
+           cash_received, discount_amount
     FROM bills WHERE bill_date = ? ORDER BY id ASC
   `).all(date);
 
-  const parsed = bills.map(b => ({
-    id: b.id,
-    billNo: b.bill_no,
-    bill_no: b.bill_no,
-    orderId: b.order_id,
-    items: (() => { try { return JSON.parse(b.items); } catch(e) { return []; } })(),
-    total: b.total,
-    paymentMode: b.payment_mode,
-    billDate: b.bill_date,
-    time: b.time || b.created_at,
-    printStatus: b.print_status,
-    createdAt: b.created_at,
-    cashReceived: b.cash_received != null ? b.cash_received : null,
-  }));
+  const parsed = bills.map(b => {
+    const total = roundMoney(b.total);
+    const discountAmount = roundMoney(b.discount_amount || 0);
+    return {
+      id: b.id,
+      billNo: b.bill_no,
+      bill_no: b.bill_no,
+      orderId: b.order_id,
+      items: (() => { try { return JSON.parse(b.items); } catch(e) { return []; } })(),
+      total,
+      subtotal: roundMoney(total + discountAmount),
+      discountAmount,
+      paymentMode: b.payment_mode,
+      billDate: b.bill_date,
+      time: b.time || b.created_at,
+      printStatus: b.print_status,
+      createdAt: b.created_at,
+      cashReceived: b.cash_received != null ? b.cash_received : null,
+    };
+  });
 
+  const totalRevenue  = roundMoney(parsed.reduce((s, b) => s + (b.total || 0), 0));
+  const totalDiscount = roundMoney(parsed.reduce((s, b) => s + b.discountAmount, 0));
   return {
     date,
     bills: parsed,
-    totalRevenue: parsed.reduce((s, b) => s + (b.total || 0), 0),
+    totalRevenue,
+    totalDiscount,
+    grossRevenue: roundMoney(totalRevenue + totalDiscount),
     totalBills: parsed.length
   };
 }
 
-function generateBillNo(date) {
-  const db = getDB();
-  const dateStr = date.replace(/-/g, "");
+function formatBillNo(date, n) {
+  return "BC-" + date.replace(/-/g, "") + "-" + n;
+}
 
-  db.prepare(`
+/**
+ * Takes the next bill number for a date. Must run inside the finalize
+ * transaction. If the counter has fallen behind the bills table (restored
+ * or hand-edited database, legacy backfill), it jumps past the highest
+ * number in use instead of failing every sale on a UNIQUE violation.
+ */
+function generateBillNo(date) {
+  stmt(`
     INSERT INTO bill_sequences (bill_date, last_number) VALUES (?, 1)
     ON CONFLICT(bill_date) DO UPDATE SET last_number = last_number + 1
   `).run(date);
 
-  const row = db.prepare(
-    "SELECT last_number FROM bill_sequences WHERE bill_date = ?"
-  ).get(date);
-
-  return "BC-" + dateStr + "-" + row.last_number;
+  let n = stmt("SELECT last_number FROM bill_sequences WHERE bill_date = ?").get(date).last_number;
+  if (stmt("SELECT 1 FROM bills WHERE bill_no = ?").get(formatBillNo(date, n))) {
+    const maxUsed = stmt(
+      "SELECT COALESCE(MAX(CAST(substr(bill_no, 13) AS INTEGER)), 0) AS m FROM bills WHERE bill_date = ?"
+    ).get(date).m;
+    n = Math.max(n, maxUsed) + 1;
+    while (stmt("SELECT 1 FROM bills WHERE bill_no = ?").get(formatBillNo(date, n))) n++;
+    stmt("UPDATE bill_sequences SET last_number = ? WHERE bill_date = ?").run(n, date);
+  }
+  return formatBillNo(date, n);
 }
 
 /**
@@ -511,70 +583,125 @@ function generateBillNo(date) {
  * Used for receipt preview only.
  */
 function peekNextBillNo(date) {
-  const db = getDB();
-  const dateStr = date.replace(/-/g, "");
-  const row = db.prepare(
+  const row = stmt(
     "SELECT last_number FROM bill_sequences WHERE bill_date = ?"
   ).get(date);
-  const nextNum = row ? row.last_number + 1 : 1;
-  return "BC-" + dateStr + "-" + nextNum;
-} 
+  return formatBillNo(date, row ? row.last_number + 1 : 1);
+}
 
+/**
+ * Saves a bill in ONE transaction: takes the bill number, deducts stock,
+ * inserts the bill and closes the table's saved cart. Either all of it
+ * happens or none of it does, so a failure can never leave a saved bill
+ * behind a cart that is still open (which the cashier would bill again).
+ */
 function finalizeOrder(bill, items, shouldDeductInventory) {
   const db = getDB();
+  const stockWarnings = [];
+  const findStock = stmt("SELECT stock FROM inventory WHERE LOWER(name) = LOWER(?) AND archived = 0");
+  const takeStock = stmt(
+    "UPDATE inventory SET stock = MAX(0, stock - ?), updated_at = datetime('now') WHERE LOWER(name) = LOWER(?) AND archived = 0"
+  );
 
   const tx = db.transaction(() => {
-    // Step 1 — If shouldDeductInventory is true, deduct inventory:
+    // Step 1 — Generate bill number first so stock changes can reference it:
+    const billDate = bill.billDate || bill.bill_date || localDate();
+    const freshBillNo = generateBillNo(billDate);
+    const orderId = bill.orderId || bill.order_id || "";
+
+    // Step 2 — If shouldDeductInventory is true, deduct inventory:
     if (shouldDeductInventory) {
       items.forEach(item => {
-        const base = item.name.replace(/\s*\(Half\)|\s*\(Full\)/gi, "").trim();
+        const base = baseItemName(item.name);
         const qty = item.quantity || 1;
-        const result = db.prepare(
-          "UPDATE inventory SET stock = MAX(0, stock - ?) WHERE LOWER(name) = LOWER(?)"
-        ).run(qty, base);
-        if (result.changes === 0) {
+        const row = findStock.get(base);
+        if (!row) {
           console.warn("[INVENTORY_MISS] No match for:", base);
-        } else {
-          writeInventoryAuditLog(base, -qty, 'deducted', 'sale', null); // bill_no added after insert
+          return;
+        }
+        takeStock.run(qty, base);
+        writeInventoryAuditLog(base, -Math.min(qty, row.stock), 'deducted', 'sale', freshBillNo);
+        // Selling more than recorded stock: keep stock at 0 but record the
+        // shortfall so the owner can see the count was wrong.
+        if (qty > row.stock) {
+          const short = qty - row.stock;
+          writeInventoryAuditLog(base, -short, 'oversold', 'sale', freshBillNo);
+          stockWarnings.push({ name: base, sold: qty, inStock: row.stock, short });
         }
       });
     }
 
-    // Step 2 — Generate bill number (call generateBillNo inside same tx):
-    const billDate = bill.billDate || bill.bill_date || new Date().toISOString().split("T")[0];
-    const freshBillNo = generateBillNo(billDate);
-
     // Step 3 — Insert bill:
     const cashReceivedVal = (bill.paymentMode === "Cash" && bill.cashReceived != null)
-      ? bill.cashReceived
+      ? roundMoney(bill.cashReceived)
       : null;
-    db.prepare(`
-      INSERT INTO bills (bill_no, order_id, items, total, payment_mode, bill_date, time, cash_received)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    stmt(`
+      INSERT INTO bills (bill_no, order_id, items, total, payment_mode, bill_date, time, cash_received,
+                         discount_amount, stock_deducted)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       freshBillNo,
-      bill.orderId || bill.order_id || "",
+      orderId,
       JSON.stringify(bill.items || []),
-      bill.total || 0,
+      roundMoney(bill.total || 0),
       bill.paymentMode || bill.payment_mode || "Cash",
       billDate,
       bill.time || new Date().toISOString(),
-      cashReceivedVal
+      cashReceivedVal,
+      roundMoney(bill.discountAmount || 0),
+      shouldDeductInventory ? 1 : 0
     );
 
-    // Step 4 — Return freshBillNo from transaction
+    // Step 4 — Close the table's saved cart in the same transaction:
+    if (orderId) removeSession(orderId);
+
+    // Step 5 — Return freshBillNo from transaction
     return freshBillNo;
   });
 
-  return tx();
+  const billNo = tx();
+  if (stockWarnings.length) bill.stockWarnings = stockWarnings;
+  return billNo;
 }
 
-function deleteBill(billNo) {
+/**
+ * Delete a bill and (optionally) put its items back into stock in ONE
+ * transaction, so a failure can never leave a deleted bill with stock missing.
+ * Only stock that this bill really took out is put back: nothing if inventory
+ * tracking was off when it was sold, and never the oversold units.
+ */
+function deleteBill(billNo, restoreStock = false) {
   const db = getDB();
-  const bill = db.prepare("SELECT * FROM bills WHERE bill_no = ?").get(billNo);
-  if (!bill) return null;
-  db.prepare("DELETE FROM bills WHERE bill_no = ?").run(billNo);
-  return { ...bill, items: (() => { try { return JSON.parse(bill.items); } catch(e) { return []; } })() };
+  const tx = db.transaction(() => {
+    const bill = db.prepare("SELECT * FROM bills WHERE bill_no = ?").get(billNo);
+    if (!bill) return null;
+    let items = [];
+    try { items = JSON.parse(bill.items); } catch (_e) { items = []; }
+    db.prepare("DELETE FROM bills WHERE bill_no = ?").run(billNo);
+    if (restoreStock && bill.stock_deducted === 1) {
+      // The sale logged exactly what it took out of stock against this bill.
+      const taken = db.prepare(
+        "SELECT item_name AS name, SUM(-quantity_change) AS quantity FROM inventory_audit_log WHERE bill_no = ? AND reason = 'deducted' GROUP BY LOWER(item_name)"
+      ).all(billNo).filter(r => r.quantity > 0);
+      if (taken.length) restoreInventory(taken, billNo);
+    } else if (restoreStock && bill.stock_deducted == null && Array.isArray(items) && items.length) {
+      // Bill from before stock_deducted existed: restore from its items.
+      // Units that were oversold never came out of stock, so don't add them back.
+      const oversold = {};
+      db.prepare(
+        "SELECT LOWER(item_name) AS n, SUM(-quantity_change) AS q FROM inventory_audit_log WHERE bill_no = ? AND reason = 'oversold' GROUP BY LOWER(item_name)"
+      ).all(billNo).forEach(r => { oversold[r.n] = r.q; });
+      const toRestore = items.map(it => {
+        const key = baseItemName(it.name).toLowerCase();
+        const skip = Math.min(oversold[key] || 0, it.quantity || 1);
+        oversold[key] = (oversold[key] || 0) - skip;
+        return { ...it, quantity: (it.quantity || 1) - skip };
+      }).filter(it => it.quantity > 0);
+      if (toRestore.length) restoreInventory(toRestore, billNo);
+    }
+    return { ...bill, items };
+  });
+  return tx();
 }
 
 function writeAuditLog(action, entityType, entityId, before, after) { 
@@ -613,7 +740,7 @@ function getWeeklyRevenue() {
   for (let i = 6; i >= 0; i--) { 
     const d = new Date(); 
     d.setDate(d.getDate() - i); 
-    dates.push(d.toISOString().split("T")[0]); 
+    dates.push(localDate(d)); 
   } 
  
   const placeholders = dates.map(() => "?").join(","); 
@@ -626,11 +753,11 @@ function getWeeklyRevenue() {
  
   return dates.map(date => { 
     const row = rows.find(r => r.bill_date === date); 
-    return { 
-      date, 
-      revenue: row?.revenue || 0, 
-      bills: row?.bills || 0 
-    }; 
+    return {
+      date,
+      revenue: roundMoney(row?.revenue || 0),
+      bills: row?.bills || 0
+    };
   }); 
  }
 
@@ -641,31 +768,42 @@ function getSalesDates() {
     .map(row => row.bill_date);
 }
 
+/**
+ * Settings are stored as text; booleans and numbers are converted back here
+ * so callers never see "false" (a truthy string) where they expect false.
+ */
 function readSettings() {
-  const rows = getDB().prepare("SELECT key, value FROM settings").all();
+  const rows = stmt("SELECT key, value FROM settings").all();
   const s = {};
-  rows.forEach(r => {
-    s[r.key] = r.key === "numberOfTables" ? parseInt(r.value) : r.key === "inventoryEnabled" ? r.value === "true" : r.value;
-  });
-  return { numberOfTables: 6, inventoryEnabled: true, ...s };
+  rows.forEach(r => { s[r.key] = r.value; });
+  const tables = parseInt(s.numberOfTables, 10);
+  const parsed = {
+    ...s,
+    numberOfTables:   Number.isInteger(tables) && tables > 0 ? tables : 6,
+    inventoryEnabled: s.inventoryEnabled === undefined ? true : s.inventoryEnabled === "true",
+  };
+  if (s.useThermalPrinting !== undefined) parsed.useThermalPrinting = s.useThermalPrinting !== "false";
+  return parsed;
 }
 
 function saveSettings(settings) {
   const db = getDB();
   const upsert = db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)");
-  Object.entries(settings).forEach(([k, v]) => upsert.run(k, String(v)));
+  db.transaction(() => {
+    Object.entries(settings).forEach(([k, v]) => upsert.run(k, String(v)));
+  })();
 }
 
 module.exports = {
-  calculateCartTotal, getInventoryStockByName,
+  calculateCartTotal, getInventoryStockByName, baseItemName,
   readMenu, addCategory, renameCategory, deleteCategory, getCategoryId, getProductId,
   addProduct, editProductPrice, deleteProduct, toggleProductAvailability,
   addAddon, removeAddon,
-  readInventory, updateStock, updateLowstock, addInventoryItem,
-  deleteInventoryItem, archiveInventoryItem, deductInventory, restoreInventory,
+  readInventory, updateStock, updateLowstock, addInventoryItem, ensureInventoryItem,
+  deleteInventoryItem, archiveInventoryItem, restoreInventory,
   getInventorySyncStatus, syncInventoryToMenu, bulkUpdateStock,
   writeInventoryAuditLog, getInventoryAuditLog,
-  readSessions, saveSession, removeSession,
+  readSessions, saveSession, removeSession, cleanupOldOrders,
   readSalesData, finalizeOrder, deleteBill, markBillPrinted, writeAuditLog, readAuditLog, getWeeklyRevenue, getSalesDates, generateBillNo, peekNextBillNo,
   readSettings, saveSettings
 };

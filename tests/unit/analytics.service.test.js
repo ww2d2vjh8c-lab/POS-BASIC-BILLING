@@ -180,4 +180,54 @@ describe('computeAnalytics — salesByCategory', () => {
     expect(coffee.revenue).toBe(0.30);
     expect(String(coffee.revenue)).not.toMatch(/\d{4,}/);
   });
+
+  test('a bill discount is spread over its categories so they add up to the money taken', () => {
+    const bills = [makeBill({
+      total: 180,
+      discountAmount: 20,
+      items: [
+        { name: 'Espresso', price: 80,  quantity: 1, addons: [] },
+        { name: 'Sandwich', price: 120, quantity: 1, addons: [] },
+      ],
+    })];
+    const result = computeAnalytics(bills, sampleMenu);
+    expect(result.salesByCategory.find(c => c.name === 'Coffee').revenue).toBe(72);
+    expect(result.salesByCategory.find(c => c.name === 'Food').revenue).toBe(108);
+    expect(result.salesByCategory.reduce((s, c) => s + c.revenue, 0)).toBe(180);
+  });
+
+  test('older bills without a stored discount are still allocated by what was paid', () => {
+    const bills = [makeBill({
+      total: 100, // 200 of items, discount not recorded
+      items: [{ name: 'Espresso', price: 100, quantity: 2, addons: [] }],
+    })];
+    const result = computeAnalytics(bills, sampleMenu);
+    expect(result.salesByCategory.find(c => c.name === 'Coffee').revenue).toBe(100);
+  });
+});
+
+// ── Discount totals ───────────────────────────────────────────────────────────
+describe('computeAnalytics — discount totals', () => {
+  test('reports total discount and revenue before discount', () => {
+    const bills = [
+      makeBill({ total: 180, discountAmount: 20 }),
+      makeBill({ total: 230 }),
+    ];
+    const result = computeAnalytics(bills, sampleMenu);
+    expect(result.totalDiscount).toBe(20);
+    expect(result.grossRevenue).toBe(430);
+  });
+
+  test('empty input reports zero discount', () => {
+    expect(computeAnalytics([], sampleMenu).totalDiscount).toBe(0);
+  });
+
+  test('hourly totals are rounded to paise', () => {
+    const bills = [
+      makeBill({ time: '2024-01-15T09:00:00.000Z', total: 0.1 }),
+      makeBill({ time: '2024-01-15T09:10:00.000Z', total: 0.2 }),
+    ];
+    const hour = new Date('2024-01-15T09:00:00.000Z').getHours();
+    expect(computeAnalytics(bills, sampleMenu).salesByHour[hour]).toBe(0.3);
+  });
 });

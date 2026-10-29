@@ -1,3 +1,5 @@
+'use strict';
+
 const path = require("path");
 const fs = require("fs");
 const { getDB, getUserDataPath } = require("./database");
@@ -18,13 +20,24 @@ function getMigrationVersion() {
   }
 }
 
+/**
+ * Records the schema version. Throws on failure so the surrounding migration
+ * transaction rolls back and is retried on the next start.
+ */
 function setMigrationVersion(version) {
-  try {
-    const db = getDB();
-    db.prepare("INSERT OR REPLACE INTO migration_version (id, version, last_migration) VALUES (1, ?, datetime('now'))").run(version);
-  } catch (e) {
-    console.error("[MIGRATE] Failed to set migration version:", e.message);
-  }
+  getDB().prepare("INSERT OR REPLACE INTO migration_version (id, version, last_migration) VALUES (1, ?, datetime('now'))").run(version);
+}
+
+/**
+ * Adds a column unless it is already there. Any other failure (disk error,
+ * locked file, bad SQL) is thrown, so a migration can never be marked as done
+ * while its column is missing.
+ */
+function addColumnIfMissing(db, table, column, definition) {
+  const exists = db.prepare(`PRAGMA table_info(${table})`).all().some(c => c.name === column);
+  if (exists) return false;
+  db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  return true;
 }
 
 function migrateProductAddons(db, userData) {
@@ -76,15 +89,55 @@ function migrateProductAddons(db, userData) {
 }
 
 /**
+ * Migration v6: Link inventory rows to their menu product by name.
+ * Seeded and manually added stock items had no product_id, so the Inventory
+ * screen showed them as "Uncategorized" / "Not Connected" even when a menu
+ * product with the same name exists. Only links when exactly one active
+ * product matches (names are unique per category, not globally).
+ */
+function runMigrationV6(db) {
+  logger.info("MIGRATE_V6_START");
+  db.transaction(() => {
+    const linked = db.prepare(`
+      UPDATE inventory
+      SET product_id = (
+        SELECT p.id FROM products p WHERE LOWER(p.name) = LOWER(inventory.name)
+      ), updated_at = datetime('now')
+      WHERE product_id IS NULL
+        AND archived = 0
+        AND (SELECT COUNT(*) FROM products p WHERE LOWER(p.name) = LOWER(inventory.name)) = 1
+    `).run().changes;
+    setMigrationVersion(6);
+    logger.info("MIGRATE_V6_COMPLETE", { linked });
+  })();
+}
+
+/**
+ * Migration v5: Money and stock bookkeeping on bills.
+ * - discount_amount: the discount given, so subtotal = total + discount_amount
+ *   and reports / reprints show it (previously it was applied and forgotten).
+ * - stock_deducted: 1 if this bill took items out of stock, 0 if inventory
+ *   tracking was off. NULL for older bills (unknown). Deleting a bill uses it
+ *   so stock that was never taken out is never "restored".
+ */
+function runMigrationV5(db) {
+  logger.info("MIGRATE_V5_START");
+  db.transaction(() => {
+    addColumnIfMissing(db, "bills", "discount_amount", "REAL NOT NULL DEFAULT 0");
+    addColumnIfMissing(db, "bills", "stock_deducted", "INTEGER");
+    setMigrationVersion(5);
+    logger.info("MIGRATE_V5_COMPLETE");
+  })();
+}
+
+/**
  * Migration v4: Persist cash_received on bills.
  * - Adds cash_received REAL column to bills (nullable — only set for Cash payments).
  */
 function runMigrationV4(db) {
   logger.info("MIGRATE_V4_START");
   db.transaction(() => {
-    try {
-      db.exec("ALTER TABLE bills ADD COLUMN cash_received REAL");
-    } catch (_e) { /* column already exists — safe to ignore */ }
+    addColumnIfMissing(db, "bills", "cash_received", "REAL");
     setMigrationVersion(4);
     logger.info("MIGRATE_V4_COMPLETE");
   })();
@@ -99,18 +152,11 @@ function runMigrationV4(db) {
 function runMigrationV3(db) {
   logger.info("MIGRATE_V3_START");
   db.transaction(() => {
-    const alterStatements = [
-      "ALTER TABLE inventory ADD COLUMN product_id INTEGER REFERENCES products(id) ON DELETE SET NULL",
-      "ALTER TABLE inventory ADD COLUMN archived INTEGER NOT NULL DEFAULT 0",
-      "ALTER TABLE inventory_audit_log ADD COLUMN source TEXT DEFAULT 'manual'",
-    ];
-    for (const sql of alterStatements) {
-      try { db.exec(sql); } catch (_e) { /* column already exists — safe to ignore */ }
-    }
-    try {
-      db.exec("CREATE INDEX IF NOT EXISTS idx_inventory_product ON inventory(product_id)");
-      db.exec("CREATE INDEX IF NOT EXISTS idx_inventory_archived ON inventory(archived)");
-    } catch (_e) {}
+    addColumnIfMissing(db, "inventory", "product_id", "INTEGER REFERENCES products(id) ON DELETE SET NULL");
+    addColumnIfMissing(db, "inventory", "archived", "INTEGER NOT NULL DEFAULT 0");
+    addColumnIfMissing(db, "inventory_audit_log", "source", "TEXT DEFAULT 'manual'");
+    db.exec("CREATE INDEX IF NOT EXISTS idx_inventory_product ON inventory(product_id)");
+    db.exec("CREATE INDEX IF NOT EXISTS idx_inventory_archived ON inventory(archived)");
 
     setMigrationVersion(3);
     logger.info("MIGRATE_V3_COMPLETE");
@@ -131,144 +177,112 @@ function runMigrationV2(db) {
 
     // These columns were previously added via try/catch ALTER TABLE on every
     // startup. Now they run exactly once, tracked by migration version.
-    const alterStatements = [
-      "ALTER TABLE bills ADD COLUMN time TEXT",
-      "ALTER TABLE bills ADD COLUMN idempotency_key TEXT UNIQUE",
-      "ALTER TABLE bills ADD COLUMN print_status TEXT DEFAULT 'pending'",
-    ];
-    for (const sql of alterStatements) {
-      try { db.exec(sql); } catch (_e) { /* column already exists */ }
-    }
+    // (SQLite cannot ADD a UNIQUE column; the base schema declares it UNIQUE.)
+    addColumnIfMissing(db, "bills", "time", "TEXT");
+    addColumnIfMissing(db, "bills", "idempotency_key", "TEXT");
+    addColumnIfMissing(db, "bills", "print_status", "TEXT DEFAULT 'pending'");
 
     setMigrationVersion(2);
     logger.info("MIGRATE_V2_COMPLETE");
   })();
 }
 
+/** Schema migrations, applied in order. Each one runs in its own transaction. */
+const SCHEMA_MIGRATIONS = [
+  [2, runMigrationV2],
+  [3, runMigrationV3],
+  [4, runMigrationV4],
+  [5, runMigrationV5],
+  [6, runMigrationV6],
+];
+
+/** v1: one-time import of the legacy menu.json / inventory.json files. */
+function importLegacyJSON(db, userData) {
+  logger.info("MIGRATE_JSON_TO_SQLITE_START", { version: 1 });
+
+  const migrate = db.transaction(() => {
+    const menuPath = path.join(userData, "menu.json");
+    if (fs.existsSync(menuPath)) {
+      try {
+        const menu = JSON.parse(fs.readFileSync(menuPath, "utf-8"));
+        const insCat = db.prepare("INSERT OR IGNORE INTO categories (name, sort_order) VALUES (?, ?)");
+        const getCat = db.prepare("SELECT id FROM categories WHERE name = ?");
+        const insProd = db.prepare("INSERT OR IGNORE INTO products (category_id, name, price, half_price, has_variants, available) VALUES (?, ?, ?, ?, ?, ?)");
+        const insAddon = db.prepare("INSERT OR IGNORE INTO addons (name, price) VALUES (?, ?)");
+        (menu.categories || []).forEach((cat, i) => {
+          insCat.run(cat.name, i);
+          const row = getCat.get(cat.name);
+          (cat.products || []).forEach(p => {
+            insProd.run(
+              row.id,
+              p.name,
+              p.price || 0,
+              p.halfPrice || null,
+              p.hasVariants ? 1 : 0,
+              p.unavailable === true ? 0 : p.available !== false ? 1 : 0
+            );
+          });
+        });
+        (menu.addons || []).forEach(a => insAddon.run(a.name, a.price || 0));
+        logger.info("MIGRATE_MENU_MIGRATED", { categories: menu.categories?.length || 0, products: menu.categories?.reduce((sum, cat) => sum + (cat.products?.length || 0), 0) || 0 });
+      } catch (e) {
+        logger.error("MIGRATE_MENU_FAILED", { error: e.message, stack: e.stack, menuPath });
+        throw new Error(`Menu migration failed: ${e.message}. Check menu.json format and permissions.`);
+      }
+    }
+
+    const invPath = path.join(userData, "inventory.json");
+    if (fs.existsSync(invPath)) {
+      try {
+        const inv = JSON.parse(fs.readFileSync(invPath, "utf-8"));
+        const insInv = db.prepare("INSERT OR IGNORE INTO inventory (name, stock, low_stock_alert) VALUES (?, ?, ?)");
+        (inv.items || []).forEach(i => insInv.run(i.name, i.stock || 0, i.lowStock || 5));
+        logger.info("MIGRATE_INVENTORY_MIGRATED", { items: inv.items?.length || 0 });
+      } catch (e) {
+        logger.error("MIGRATE_INVENTORY_FAILED", { error: e.message, stack: e.stack, invPath });
+        throw new Error(`Inventory migration failed: ${e.message}. Check inventory.json format and permissions.`);
+      }
+    }
+
+    // Mark migration as complete
+    db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)").run("migration_done", "true");
+    setMigrationVersion(1);
+    logger.info("MIGRATE_COMPLETE", { version: 1 });
+  });
+
+  migrate();
+}
+
+/**
+ * Brings the database up to the current schema. Never throws: a failed step
+ * is logged and retried on the next launch, and the app keeps running.
+ */
 function migrateFromJSON() {
   const db = getDB();
   const currentVersion = getMigrationVersion();
   const userData = getUserDataPath();
 
   if (currentVersion === 0) {
-    logger.info("MIGRATE_JSON_TO_SQLITE_START", { version: 1 });
-    
-    const migrate = db.transaction(() => {
-      try {
-        const menuPath = path.join(userData, "menu.json");
-        if (fs.existsSync(menuPath)) {
-          try {
-            const menu = JSON.parse(fs.readFileSync(menuPath, "utf-8"));
-            const insCat = db.prepare("INSERT OR IGNORE INTO categories (name, sort_order) VALUES (?, ?)");
-            const insProd = db.prepare("INSERT OR IGNORE INTO products (category_id, name, price, half_price, has_variants, available) VALUES (?, ?, ?, ?, ?, ?)");
-            const insAddon = db.prepare("INSERT OR IGNORE INTO addons (name, price) VALUES (?, ?)");
-            (menu.categories || []).forEach((cat, i) => {
-              insCat.run(cat.name, i);
-              const row = db.prepare("SELECT id FROM categories WHERE name = ?").get(cat.name);
-              (cat.products || []).forEach(p => {
-                insProd.run(
-                  row.id,
-                  p.name,
-                  p.price || 0,
-                  p.halfPrice || null,
-                  p.hasVariants ? 1 : 0,
-                  p.unavailable === true ? 0 : p.available !== false ? 1 : 0
-                );
-              });
-            });
-            (menu.addons || []).forEach(a => insAddon.run(a.name, a.price || 0));
-            logger.info("MIGRATE_MENU_MIGRATED", { categories: menu.categories?.length || 0, products: menu.categories?.reduce((sum, cat) => sum + (cat.products?.length || 0), 0) || 0 });
-          } catch (e) {
-            logger.error("MIGRATE_MENU_FAILED", { 
-              error: e.message, 
-              stack: e.stack,
-              menuPath,
-              categoriesCount: menu.categories?.length || 0
-            });
-            throw new Error(`Menu migration failed: ${e.message}. Check menu.json format and permissions.`);
-          }
-        }
-        
-        const invPath = path.join(userData, "inventory.json");
-        if (fs.existsSync(invPath)) {
-          try {
-            const inv = JSON.parse(fs.readFileSync(invPath, "utf-8"));
-            const insInv = db.prepare("INSERT OR IGNORE INTO inventory (name, stock, low_stock_alert) VALUES (?, ?, ?)");
-            (inv.items || []).forEach(i => insInv.run(i.name, i.stock || 0, i.lowStock || 5));
-            logger.info("MIGRATE_INVENTORY_MIGRATED", { items: inv.items?.length || 0 });
-          } catch (e) {
-            logger.error("MIGRATE_INVENTORY_FAILED", { 
-              error: e.message, 
-              stack: e.stack,
-              invPath,
-              itemsCount: inv.items?.length || 0
-            });
-            throw new Error(`Inventory migration failed: ${e.message}. Check inventory.json format and permissions.`);
-          }
-        }
-        
-        // Mark migration as complete
-        db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)").run("migration_done", "true");
-        setMigrationVersion(1);
-        logger.info("MIGRATE_COMPLETE", { version: 1 });
-      } catch (error) {
-        logger.error("MIGRATE_TRANSACTION_ROLLBACK", { 
-          error: error.message, 
-          stack: error.stack,
-          operation: "JSON to SQLite migration",
-          version: 1
-        });
-        throw new Error(`Migration transaction failed and rolled back: ${error.message}. Database remains in previous state.`);
-      }
-    });
-    
     try {
-      migrate();
+      importLegacyJSON(db, userData);
     } catch (error) {
-      logger.error("MIGRATE_FINAL_FAILED", { 
-        error: error.message, 
-        stack: error.stack,
-        currentVersion,
-        userData
-      });
-      throw new Error(`Migration failed completely: ${error.message}. Please restart the application.`);
+      // A damaged legacy file must not stop the schema migrations below:
+      // without them every sales query fails. The transaction rolled back.
+      logger.error("MIGRATE_JSON_IMPORT_FAILED", { error: error.message, stack: error.stack, userData });
     }
   } else {
     logger.info("MIGRATE_SKIP", { currentVersion, reason: "Already migrated" });
   }
 
-  // v2 — schema cleanup (idempotent: only runs when currentVersion < 2)
-  const versionAfterV1 = getMigrationVersion();
-  if (versionAfterV1 < 2) {
+  for (const [version, run] of SCHEMA_MIGRATIONS) {
+    if (getMigrationVersion() >= version) continue;
     try {
-      runMigrationV2(db);
+      run(db);
     } catch (error) {
-      logger.error("MIGRATE_V2_FAILED", { error: error.message, stack: error.stack });
-      // Non-critical: the app still functions without the cleanup.
-      // Will retry on next launch.
-    }
-  }
-
-  // v3 — product-linked inventory (idempotent: only runs when currentVersion < 3)
-  const versionAfterV2 = getMigrationVersion();
-  if (versionAfterV2 < 3) {
-    try {
-      runMigrationV3(db);
-    } catch (error) {
-      logger.error("MIGRATE_V3_FAILED", { error: error.message, stack: error.stack });
-      // Non-critical: the app still functions without the new columns.
-      // Will retry on next launch.
-    }
-  }
-
-  // v4 — persist cash_received on bills (idempotent: only runs when currentVersion < 4)
-  const versionAfterV3 = getMigrationVersion();
-  if (versionAfterV3 < 4) {
-    try {
-      runMigrationV4(db);
-    } catch (error) {
-      logger.error("MIGRATE_V4_FAILED", { error: error.message, stack: error.stack });
-      // Non-critical: app still functions; will retry on next launch.
+      // Rolled back; later migrations may depend on this one, so stop here
+      // and retry everything from this version on the next launch.
+      logger.error(`MIGRATE_V${version}_FAILED`, { error: error.message, stack: error.stack });
+      break;
     }
   }
 
@@ -279,8 +293,8 @@ function migrateFromJSON() {
     });
     addonMigrate();
   } catch (error) {
-    logger.error("MIGRATE_ADDONS_FAILED", { 
-      error: error.message, 
+    logger.error("MIGRATE_ADDONS_FAILED", {
+      error: error.message,
       stack: error.stack,
       userData
     });
@@ -288,4 +302,4 @@ function migrateFromJSON() {
   }
 }
 
-module.exports = { migrateFromJSON, getMigrationVersion, setMigrationVersion };
+module.exports = { migrateFromJSON, getMigrationVersion, setMigrationVersion, addColumnIfMissing };

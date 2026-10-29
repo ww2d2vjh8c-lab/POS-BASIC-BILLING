@@ -43,7 +43,15 @@ async function runHealthChecks() {
     logger.warn('HEALTH_CHECK_DISK_SKIP', { error: e.message });
   }
 
-  results.status = results.database ? 'ok' : 'degraded';
+  // ── Startup recovery (restored from backup / running on a damaged file) ─
+  try {
+    const { getDatabaseState } = require('../db/database');
+    const state = getDatabaseState();
+    results.recovery = state.recovery;   // { at, reason, restoredFrom, preservedAs } | null
+    results.degraded = state.degraded;   // { at, reason } | null
+  } catch (_e) { /* optional info only */ }
+
+  results.status = results.database && !results.degraded ? 'ok' : 'degraded';
   logger.info('HEALTH_CHECK_COMPLETE', results);
   return results;
 }

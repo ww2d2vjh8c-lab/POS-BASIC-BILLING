@@ -14,8 +14,9 @@ const queries = require('../db/queries');
 /**
  * Live in-memory map: orderId → session object.
  * Shape: { sessionId, tableId, status, createdAt, updatedAt, items[], total }
+ * Null prototype so an orderId like "__proto__" or "constructor" is just a key.
  */
-const activeOrders = {};
+const activeOrders = Object.create(null);
 
 /**
  * Set of orderIds whose finalize-bill call is currently in-flight.

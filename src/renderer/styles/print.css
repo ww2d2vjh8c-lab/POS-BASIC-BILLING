@@ -1,6 +1,9 @@
-/* ==============================
-   THERMAL PRINTER STYLES
-   ============================== */
+/* =====================================================================
+   THERMAL PRINTER STYLES (58mm, 32 characters per line)
+   Printing calls webContents.print() on the main window, so everything
+   except #billContent is hidden here. The receipt text itself is a
+   monospace <pre class="receipt-pre"> built in js/bill.js.
+   ===================================================================== */
 
 @media print {
   @page {
@@ -8,17 +11,83 @@
     margin: 0;
   }
 
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+
   html, body {
     width: 58mm;
+    height: auto !important;
     margin: 0 !important;
     padding: 0 !important;
+    overflow: visible !important;
+    background: #fff !important;
   }
 
   body * { visibility: hidden; }
   #billContent, #billContent * { visibility: visible; }
 
+  /* Only the bill modal is rendered; inside it only the receipt column. */
+  body > *:not(#billModal) { display: none !important; }
+
+  #billModal {
+    display: block !important;
+    position: absolute !important;
+    inset: auto !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 58mm !important;
+    height: auto !important;
+    background: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  #billModal .modal-content {
+    display: block !important;
+    width: 58mm !important;
+    max-width: none !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: none !important;
+  }
+
+  #billModal .modal-header,
+  #billModal .modal-footer,
+  #billModal .bill-side,
+  #billModal .bill-receipt-label,
+  #billModal button,
+  #billModal h2 {
+    display: none !important;
+  }
+
+  #billModal .modal-body,
+  #billModal .bill-receipt-col,
+  #billModal .receipt-paper {
+    display: block !important;
+    width: 58mm !important;
+    max-width: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: none !important;
+    overflow: visible !important;
+  }
+
   #billContent {
     position: static;
+    box-sizing: content-box;
     width: 56mm;
     padding: 1mm;
     margin: 0;
@@ -35,45 +104,17 @@
     text-rendering: optimizeSpeed;
   }
 
-  .receipt-wrap {
-    width: 56mm;
-    max-width: 56mm;
-    font-size: 10px;
-    font-weight: bold;
-    word-break: break-word;
-    overflow: hidden;
-  }
-
-  .receipt-title-main { font-size: 13px; }
-  .receipt-tax-title { font-size: 11px; }
-  .receipt-divider { font-size: 10px; }
-  .receipt-phone { font-size: 9px; }
-  .receipt-details { font-size: 9px; }
-  .receipt-table th { font-size: 9px; }
-  .receipt-table td { font-size: 10px; }
-  .receipt-total-row { font-size: 10px; }
-  .receipt-footer-text { font-size: 10px; }
-  .receipt-footer-sub { font-size: 10px; }
-
-  body > *:not(#billModal) { display: none !important; }
-  #billModal {
-    display: block !important;
-    position: fixed;
-    top: 0; left: 0;
-    background: none !important;
-    padding: 0 !important;
+  /* Exact thermal sizing (unchanged from the original inline style). */
+  #billContent .receipt-pre {
+    font-family: 'Courier New', 'Consolas', monospace !important;
+    font-size: 9px !important;
+    line-height: 1.1 !important;
     margin: 0 !important;
-    width: 58mm !important;
-  }
-  .modal-content {
-    box-shadow: none !important;
-    border: none !important;
     padding: 0 !important;
-    margin: 0 !important;
-    background: none !important;
-    width: 58mm !important;
+    white-space: pre !important;
+    overflow: hidden !important;
+    width: 56mm !important;
+    max-width: 56mm !important;
+    color: #000 !important;
   }
-  .modal-buttons, .payment-section,
-  .bill-actions, h2, button { display: none !important; }
 }
-

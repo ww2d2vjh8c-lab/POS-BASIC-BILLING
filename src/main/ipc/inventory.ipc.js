@@ -12,6 +12,10 @@
 
 const queries = require('../db/queries');
 const logger  = require('../logger');
+const { validateString, validateCount } = require('../validator');
+
+const MAX_BULK_UPDATES = 2000;
+const STOCK_SOURCES    = new Set(['manual', 'restock', 'sale', 'sync', 'auto']);
 
 function register(ipcMain) {
 
@@ -51,8 +55,10 @@ function register(ipcMain) {
   ipcMain.handle('update-stock', async (_e, name, newStock, source) => {
     try {
       if (!name || typeof name !== 'string') return { success: false, error: 'Invalid item name' };
-      if (typeof newStock !== 'number' || newStock < 0) return { success: false, error: 'Invalid stock value' };
-      queries.updateStock(name, parseInt(newStock), source || 'manual');
+      let stock;
+      try { stock = validateCount(newStock, 'Stock'); } catch (_err) { return { success: false, error: 'Invalid stock value' }; }
+      const src = STOCK_SOURCES.has(source) ? source : 'manual';
+      if (!queries.updateStock(name, stock, src)) return { success: false, error: 'Item not found' };
       return { success: true, data: queries.readInventory() };
     } catch (e) {
       logger.error('IPC_ERROR', { channel: 'update-stock', error: e.message });
@@ -63,8 +69,9 @@ function register(ipcMain) {
   ipcMain.handle('update-lowstock', async (_e, name, newLowStock) => {
     try {
       if (!name || typeof name !== 'string') return { success: false, error: 'Invalid item name' };
-      if (typeof newLowStock !== 'number' || newLowStock < 0) return { success: false, error: 'Invalid low stock value' };
-      queries.updateLowstock(name, parseInt(newLowStock));
+      let alertAt;
+      try { alertAt = validateCount(newLowStock, 'Low stock alert'); } catch (_err) { return { success: false, error: 'Invalid low stock value' }; }
+      queries.updateLowstock(name, alertAt);
       return { success: true, data: queries.readInventory() };
     } catch (e) {
       logger.error('IPC_ERROR', { channel: 'update-lowstock', error: e.message });
@@ -75,13 +82,15 @@ function register(ipcMain) {
   ipcMain.handle('add-inventory-item', async (_e, itemData) => {
     try {
       if (!itemData?.name || typeof itemData.name !== 'string') return { success: false, error: 'Invalid item data' };
-      if (typeof itemData.stock    !== 'number' || itemData.stock    < 0) return { success: false, error: 'Invalid stock value' };
-      if (typeof itemData.lowStock !== 'number' || itemData.lowStock < 0) return { success: false, error: 'Invalid low stock value' };
+      const name = validateString(itemData.name, 'Item name');
+      let stock, alertAt;
+      try { stock   = validateCount(itemData.stock, 'Stock'); }              catch (_err) { return { success: false, error: 'Invalid stock value' }; }
+      try { alertAt = validateCount(itemData.lowStock, 'Low stock alert'); } catch (_err) { return { success: false, error: 'Invalid low stock value' }; }
       queries.addInventoryItem({
-        name:       itemData.name,
-        stock:      itemData.stock || 0,
-        alertAt:    itemData.lowStock || 5,
-        product_id: itemData.productId || null,
+        name,
+        stock,
+        alertAt,
+        product_id: Number.isInteger(itemData.productId) ? itemData.productId : null,
         source:     'manual',
       });
       return { success: true, data: queries.readInventory() };
@@ -129,7 +138,18 @@ function register(ipcMain) {
   ipcMain.handle('bulk-update-stock', async (_e, updates) => {
     try {
       if (!Array.isArray(updates)) return { success: false, error: 'Invalid updates array' };
-      const result = queries.bulkUpdateStock(updates);
+      if (updates.length > MAX_BULK_UPDATES) return { success: false, error: 'Too many updates at once' };
+      // Validate everything first: one bad row rejects the whole batch.
+      let clean;
+      try {
+        clean = updates.map((u, i) => {
+          if (!u || typeof u !== 'object') throw new Error(`Update ${i + 1} is invalid`);
+          return { name: validateString(u.name, 'Item name'), stock: validateCount(u.stock, `Stock for "${u.name}"`) };
+        });
+      } catch (err) {
+        return { success: false, error: err.message };
+      }
+      const result = queries.bulkUpdateStock(clean);
       return { success: true, data: result };
     } catch (e) {
       logger.error('IPC_ERROR', { channel: 'bulk-update-stock', error: e.message });
